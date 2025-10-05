@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API配置 - NutriScan Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px 0;
+            border-bottom: 1px solid #303030;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card {
+            background: linear-gradient(145deg, #1a1a1a 0%, #262626 100%);
+            border: 1px solid #303030;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h3 {
+            color: #ffffff;
+            margin-bottom: 16px;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #a6a6a6;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            background: #262626;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            margin: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: #404040;
+        }
+
+        .btn-success {
+            background: #52c41a;
+        }
+
+        .btn-danger {
+            background: #ff4d4f;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 12px;
+        }
+
+        .status-connected {
+            background: rgba(82, 196, 26, 0.1);
+            color: #52c41a;
+            border: 1px solid rgba(82, 196, 26, 0.3);
+        }
+
+        .status-disconnected {
+            background: rgba(255, 77, 79, 0.1);
+            color: #ff4d4f;
+            border: 1px solid rgba(255, 77, 79, 0.3);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #333;
+            border-top: 3px solid #1890ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .alert-success {
+            background: rgba(82, 196, 26, 0.1);
+            border: 1px solid rgba(82, 196, 26, 0.3);
+            color: #52c41a;
+        }
+
+        .alert-error {
+            background: rgba(255, 77, 79, 0.1);
+            border: 1px solid rgba(255, 77, 79, 0.3);
+            color: #ff4d4f;
+        }
+
+        .alert-info {
+            background: rgba(24, 144, 255, 0.1);
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            color: #1890ff;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 API配置管理</h1>
+            <p>配置您的真实API连接，获取实时数据</p>
+        </div>
+
+        <div id="alerts"></div>
+
+        <!-- Roboflow配置 -->
+        <div class="card">
+            <h3>📊 Roboflow API配置</h3>
+            <div class="grid-2">
+                <div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="roboflow-api-key" placeholder="输入您的Roboflow API Key">
+                    </div>
+                    <div class="form-group">
+                        <label>Project ID</label>
+                        <input type="text" id="roboflow-project-id" placeholder="例如: malaysian-food-detection/1">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>连接状态</label>
+                        <div>
+                            <span id="roboflow-status" class="status-indicator status-disconnected">❌ 未连接</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>操作</label>
+                        <div>
+                            <button class="btn" onclick="testConnection('roboflow')">测试连接</button>
+                            <button class="btn btn-success" onclick="saveConfig('roboflow')">保存配置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gemini配置 -->
+        <div class="card">
+            <h3>🤖 Gemini API配置</h3>
+            <div class="grid-2">
+                <div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="gemini-api-key" placeholder="输入您的Gemini API Key">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>连接状态</label>
+                        <div>
+                            <span id="gemini-status" class="status-indicator status-disconnected">❌ 未连接</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>操作</label>
+                        <div>
+                            <button class="btn" onclick="testConnection('gemini')">测试连接</button>
+                            <button class="btn btn-success" onclick="saveConfig('gemini')">保存配置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自定义API配置 -->
+        <div class="card">
+            <h3>🔗 自定义API配置</h3>
+            <div class="grid-2">
+                <div>
+                    <h4>训练API</h4>
+                    <div class="form-group">
+                        <label>Base URL</label>
+                        <input type="url" id="training-api-url" placeholder="https://your-training-api.com">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="training-api-key" placeholder="输入API Key">
+                    </div>
+                </div>
+                <div>
+                    <h4>数据集API</h4>
+                    <div class="form-group">
+                        <label>Base URL</label>
+                        <input type="url" id="dataset-api-url" placeholder="https://your-dataset-api.com">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="dataset-api-key" placeholder="输入API Key">
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div>
+                    <h4>模型API</h4>
+                    <div class="form-group">
+                        <label>Base URL</label>
+                        <input type="url" id="model-api-url" placeholder="https://your-model-api.com">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="model-api-key" placeholder="输入API Key">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>操作</label>
+                        <div>
+                            <button class="btn" onclick="testConnection('custom')">测试自定义API</button>
+                            <button class="btn btn-success" onclick="saveConfig('custom')">保存配置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配置状态 -->
+        <div class="card">
+            <h3>📊 配置状态总览</h3>
+            <div id="config-status">
+                <div class="loading"></div> 加载中...
+            </div>
+            <button class="btn" onclick="loadConfigStatus()">刷新状态</button>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="card">
+            <h3>🚀 快速操作</h3>
+            <button class="btn" onclick="loadConfigStatus()">刷新所有状态</button>
+            <button class="btn btn-secondary" onclick="clearAllConfig()">清除所有配置</button>
+            <button class="btn btn-success" onclick="window.location.href='/'">返回主页面</button>
+        </div>
+    </div>
+
+    <script>
+        // 显示提示信息
+        function showAlert(message, type = 'info') {
+            const alertsContainer = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertsContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // 测试API连接
+        async function testConnection(service) {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.innerHTML = '<span class="loading"></span> 测试中...';
+            button.disabled = true;
+
+            try {
+                const response = await fetch('/api/config/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ service })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(`${service} API连接成功！`, 'success');
+                    updateStatus(service, true);
+                } else {
+                    showAlert(`${service} API连接失败: ${result.error}`, 'error');
+                    updateStatus(service, false);
+                }
+            } catch (error) {
+                showAlert(`${service} API连接失败: ${error.message}`, 'error');
+                updateStatus(service, false);
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // 保存配置
+        async function saveConfig(service) {
+            try {
+                let config = {};
+                
+                if (service === 'roboflow') {
+                    config = {
+                        apiKey: document.getElementById('roboflow-api-key').value,
+                        projectId: document.getElementById('roboflow-project-id').value
+                    };
+                } else if (service === 'gemini') {
+                    config = {
+                        apiKey: document.getElementById('gemini-api-key').value
+                    };
+                } else if (service === 'custom') {
+                    config = {
+                        trainingAPI: {
+                            baseUrl: document.getElementById('training-api-url').value,
+                            apiKey: document.getElementById('training-api-key').value
+                        },
+                        datasetAPI: {
+                            baseUrl: document.getElementById('dataset-api-url').value,
+                            apiKey: document.getElementById('dataset-api-key').value
+                        },
+                        modelAPI: {
+                            baseUrl: document.getElementById('model-api-url').value,
+                            apiKey: document.getElementById('model-api-key').value
+                        }
+                    };
+                }
+
+                const response = await fetch('/api/config/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ service, config })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(`${service} 配置已保存！`, 'success');
+                } else {
+                    showAlert(`保存${service}配置失败: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`保存${service}配置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 更新状态指示器
+        function updateStatus(service, connected) {
+            const statusElement = document.getElementById(`${service}-status`);
+            if (statusElement) {
+                if (connected) {
+                    statusElement.className = 'status-indicator status-connected';
+                    statusElement.textContent = '✅ 已连接';
+                } else {
+                    statusElement.className = 'status-indicator status-disconnected';
+                    statusElement.textContent = '❌ 未连接';
+                }
+            }
+        }
+
+        // 加载配置状态
+        async function loadConfigStatus() {
+            const statusContainer = document.getElementById('config-status');
+            statusContainer.innerHTML = '<div class="loading"></div> 加载中...';
+
+            try {
+                const response = await fetch('/api/config/status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    let html = '<div class="grid-2">';
+                    
+                    for (const [service, status] of Object.entries(result.config_status)) {
+                        const statusClass = status.success ? 'status-connected' : 'status-disconnected';
+                        const statusText = status.success ? '✅ 已连接' : '❌ 未连接';
+                        
+                        html += `
+                            <div class="card">
+                                <h4>${service.toUpperCase()}</h4>
+                                <div class="status-indicator ${statusClass}">${statusText}</div>
+                                ${status.error ? `<p style="color: #ff4d4f; font-size: 12px; margin-top: 8px;">${status.error}</p>` : ''}
+                            </div>
+                        `;
+                    }
+                    
+                    html += '</div>';
+                    statusContainer.innerHTML = html;
+                } else {
+                    statusContainer.innerHTML = '<p style="color: #ff4d4f;">加载配置状态失败</p>';
+                }
+            } catch (error) {
+                statusContainer.innerHTML = `<p style="color: #ff4d4f;">加载配置状态失败: ${error.message}</p>`;
+            }
+        }
+
+        // 清除所有配置
+        function clearAllConfig() {
+            if (confirm('确定要清除所有API配置吗？')) {
+                // 清除表单
+                document.querySelectorAll('input[type="password"], input[type="text"], input[type="url"]').forEach(input => {
+                    input.value = '';
+                });
+                
+                // 更新状态
+                ['roboflow', 'gemini'].forEach(service => {
+                    updateStatus(service, false);
+                });
+                
+                showAlert('所有配置已清除', 'info');
+            }
+        }
+
+        // 页面加载时获取配置状态
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfigStatus();
+        });
+    </script>
+</body>
+</html>

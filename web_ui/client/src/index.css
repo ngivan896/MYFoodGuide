@@ -1,0 +1,308 @@
+/* 全局样式重置和基础样式 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0f0f0f;
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+/* 自定义动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 通用动画类 */
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* 布局样式 */
+.app-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+}
+
+.main-content {
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+}
+
+/* 卡片样式增强 */
+.enhanced-card {
+  background: linear-gradient(145deg, #1a1a1a 0%, #262626 100%);
+  border: 1px solid #303030;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.enhanced-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  border-color: #1890ff;
+}
+
+/* 状态指示器 */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-running {
+  background: rgba(82, 196, 26, 0.1);
+  color: #52c41a;
+  border: 1px solid rgba(82, 196, 26, 0.3);
+}
+
+.status-pending {
+  background: rgba(250, 173, 20, 0.1);
+  color: #faad14;
+  border: 1px solid rgba(250, 173, 20, 0.3);
+}
+
+.status-completed {
+  background: rgba(24, 144, 255, 0.1);
+  color: #1890ff;
+  border: 1px solid rgba(24, 144, 255, 0.3);
+}
+
+.status-error {
+  background: rgba(255, 77, 79, 0.1);
+  color: #ff4d4f;
+  border: 1px solid rgba(255, 77, 79, 0.3);
+}
+
+/* 进度条样式 */
+.progress-container {
+  background: #262626;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #404040;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1890ff 0%, #40a9ff 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px;
+  }
+  
+  .enhanced-card {
+    margin-bottom: 16px;
+  }
+}
+
+/* 加载状态 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 15, 15, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid #333;
+  border-top: 3px solid #1890ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 工具提示样式 */
+.ant-tooltip-inner {
+  background: #262626;
+  color: #ffffff;
+  border: 1px solid #404040;
+}
+
+.ant-tooltip-arrow::before {
+  background: #262626;
+  border: 1px solid #404040;
+}
+
+/* 表格样式增强 */
+.ant-table-thead > tr > th {
+  background: #262626;
+  border-bottom: 1px solid #404040;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #303030;
+  color: #ffffff;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #262626;
+}
+
+/* 按钮样式增强 */
+.ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+/* 输入框样式 */
+.ant-input {
+  background: #262626;
+  border: 1px solid #404040;
+  color: #ffffff;
+}
+
+.ant-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.ant-select-selector {
+  background: #262626 !important;
+  border: 1px solid #404040 !important;
+  color: #ffffff !important;
+}
+
+/* 模态框样式 */
+.ant-modal-content {
+  background: #1a1a1a;
+  border: 1px solid #303030;
+}
+
+.ant-modal-header {
+  background: #262626;
+  border-bottom: 1px solid #404040;
+}
+
+.ant-modal-title {
+  color: #ffffff;
+}
+
+.ant-modal-close {
+  color: #a6a6a6;
+}
+
+.ant-modal-close:hover {
+  color: #ffffff;
+}
+
+/* 通知样式 */
+.ant-notification {
+  background: #1a1a1a;
+  border: 1px solid #303030;
+}
+
+.ant-notification-notice-message {
+  color: #ffffff;
+}
+
+.ant-notification-notice-description {
+  color: #a6a6a6;
+}
