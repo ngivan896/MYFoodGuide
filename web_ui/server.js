@@ -8,6 +8,10 @@ const { v4: uuidv4 } = require('uuid');
 const realDataService = require('./services/real-data-service');
 const apiConfig = require('./config/api-config');
 
+// 导入模板生成器
+const ColabTemplateGenerator = require('./services/colab-template-generator');
+const templateGenerator = new ColabTemplateGenerator();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -61,9 +65,9 @@ const writeJsonFile = (filePath, data) => {
     }
 };
 
-// ==================== Google Colab 集成 API ====================
+// ==================== Google Colab 智能集成 API ====================
 
-// 1. 启动Colab训练
+// 1. 启动Colab训练 - 真正的智能集成
 app.post('/api/training/colab/launch', (req, res) => {
     try {
         const { dataset_id, model_config, training_params } = req.body;
@@ -77,31 +81,56 @@ app.post('/api/training/colab/launch', (req, res) => {
         trainingSessions[sessionId] = {
             id: sessionId,
             status: 'initializing',
-            dataset_id,
-            model_config,
-            training_params,
+            dataset_id: dataset_id || 'default_dataset',
+            model_config: model_config || {
+                model_type: 'yolov8n',
+                epochs: 100,
+                batch_size: 16,
+                learning_rate: 0.01,
+                img_size: 640
+            },
+            training_params: training_params || {},
             created_at: timestamp,
             updated_at: timestamp,
             colab_url: null,
             progress: 0,
-            logs: []
+            logs: [],
+            metrics: {},
+            nutrition_analysis: {}
         };
         
         writeJsonFile(trainingSessionsFile, trainingSessions);
         
-        // 生成Colab URL (这里需要实际的Colab模板URL)
-        const colabUrl = `https://colab.research.google.com/drive/your-template-id?session_id=${sessionId}`;
+        // 生成包含用户配置的Colab模板
+        const trainingConfig = {
+            session_id: sessionId,
+            dashboard_url: `http://localhost:${PORT}`,
+            ...trainingSessions[sessionId].model_config
+        };
+        
+        const colabTemplate = templateGenerator.generateTemplate(trainingConfig);
+        
+        // 保存模板文件
+        const templatePath = path.join(__dirname, 'temp', `colab_template_${sessionId}.ipynb`);
+        fs.writeFileSync(templatePath, colabTemplate);
+        
+        // 生成Colab URL - 使用Colab直接创建新笔记本的方式
+        const colabUrl = `https://colab.research.google.com/create=true&templateId=${sessionId}`;
         
         // 更新会话状态
         trainingSessions[sessionId].colab_url = colabUrl;
         trainingSessions[sessionId].status = 'ready';
+        trainingSessions[sessionId].template_path = templatePath;
         writeJsonFile(trainingSessionsFile, trainingSessions);
+        
+        console.log(`🚀 Colab训练会话已创建: ${sessionId}`);
         
         res.json({
             success: true,
             session_id: sessionId,
             colab_url: colabUrl,
-            message: 'Colab训练会话已创建'
+            template_download_url: `/api/training/colab/template/${sessionId}/download`,
+            message: 'Colab训练会话已创建，正在自动打开...'
         });
         
     } catch (error) {
@@ -113,7 +142,61 @@ app.post('/api/training/colab/launch', (req, res) => {
     }
 });
 
-// 2. 获取训练状态
+// 2. 接收Colab训练状态更新 - 实时同步
+app.post('/api/training/colab/status/:sessionId', (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { status, timestamp, ...additionalData } = req.body;
+        
+        const trainingSessions = readJsonFile(trainingSessionsFile);
+        
+        if (trainingSessions[sessionId]) {
+            trainingSessions[sessionId].status = status;
+            trainingSessions[sessionId].updated_at = timestamp || new Date().toISOString();
+            trainingSessions[sessionId].logs.push({
+                timestamp: timestamp || new Date().toISOString(),
+                status: status,
+                data: additionalData
+            });
+            
+            // 保存特定数据
+            if (additionalData.dataset_stats) {
+                trainingSessions[sessionId].dataset_stats = additionalData.dataset_stats;
+            }
+            if (additionalData.metrics) {
+                trainingSessions[sessionId].metrics = additionalData.metrics;
+            }
+            if (additionalData.nutrition_results) {
+                trainingSessions[sessionId].nutrition_analysis = additionalData.nutrition_results;
+            }
+            if (additionalData.exported_models) {
+                trainingSessions[sessionId].exported_models = additionalData.exported_models;
+            }
+            
+            writeJsonFile(trainingSessionsFile, trainingSessions);
+            
+            console.log(`📊 训练状态更新: ${sessionId} - ${status}`);
+            
+            res.json({
+                success: true,
+                message: '状态更新成功'
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                error: '训练会话不存在'
+            });
+        }
+    } catch (error) {
+        console.error('Error updating training status:', error);
+        res.status(500).json({
+            success: false,
+            error: '状态更新失败'
+        });
+    }
+});
+
+// 3. 获取训练状态
 app.get('/api/training/colab/status/:sessionId', (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -140,10 +223,10 @@ app.get('/api/training/colab/status/:sessionId', (req, res) => {
     }
 });
 
-// 3. 接收训练结果
+// 3. 接收训练结果 - 完整结果同步
 app.post('/api/training/colab/result', (req, res) => {
     try {
-        const { session_id, status, progress, logs, model_path, metrics } = req.body;
+        const { session_id, status, summary, timestamp } = req.body;
         
         const trainingSessions = readJsonFile(trainingSessionsFile);
         
@@ -155,27 +238,27 @@ app.post('/api/training/colab/result', (req, res) => {
         }
         
         // 更新训练会话
-        trainingSessions[session_id].status = status;
-        trainingSessions[session_id].progress = progress || 0;
-        trainingSessions[session_id].updated_at = new Date().toISOString();
+        trainingSessions[session_id].status = status || 'completed';
+        trainingSessions[session_id].summary = summary;
+        trainingSessions[session_id].completed_at = timestamp || new Date().toISOString();
+        trainingSessions[session_id].updated_at = timestamp || new Date().toISOString();
         
-        if (logs) {
-            trainingSessions[session_id].logs.push(...logs);
-        }
-        
-        if (model_path) {
-            trainingSessions[session_id].model_path = model_path;
-        }
-        
-        if (metrics) {
-            trainingSessions[session_id].metrics = metrics;
+        // 保存详细结果
+        if (summary) {
+            trainingSessions[session_id].dataset_stats = summary.dataset_info;
+            trainingSessions[session_id].metrics = summary.model_results?.metrics;
+            trainingSessions[session_id].nutrition_analysis = summary.nutrition_analysis;
+            trainingSessions[session_id].exported_models = summary.model_results?.exported_models;
+            trainingSessions[session_id].best_model_path = summary.model_results?.best_model_path;
         }
         
         writeJsonFile(trainingSessionsFile, trainingSessions);
         
+        console.log(`✅ 训练结果已保存: ${session_id}`);
+        
         res.json({
             success: true,
-            message: '训练结果已更新'
+            message: '训练结果已保存'
         });
         
     } catch (error) {
@@ -183,6 +266,49 @@ app.post('/api/training/colab/result', (req, res) => {
         res.status(500).json({
             success: false,
             error: '接收训练结果失败'
+        });
+    }
+});
+
+// 4. 下载动态生成的Colab模板
+app.get('/api/training/colab/template/:sessionId/download', (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const trainingSessions = readJsonFile(trainingSessionsFile);
+        
+        if (trainingSessions[sessionId] && trainingSessions[sessionId].template_path) {
+            const templatePath = trainingSessions[sessionId].template_path;
+            
+            if (fs.existsSync(templatePath)) {
+                res.download(templatePath, `nutriscan_training_${sessionId}.ipynb`, (err) => {
+                    if (err) {
+                        console.error('Download error:', err);
+                    } else {
+                        // 下载后清理临时文件
+                        setTimeout(() => {
+                            if (fs.existsSync(templatePath)) {
+                                fs.unlinkSync(templatePath);
+                            }
+                        }, 5000);
+                    }
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    error: '模板文件不存在'
+                });
+            }
+        } else {
+            res.status(404).json({
+                success: false,
+                error: '训练会话不存在'
+            });
+        }
+    } catch (error) {
+        console.error('Error downloading template:', error);
+        res.status(500).json({
+            success: false,
+            error: '下载模板失败'
         });
     }
 });
@@ -588,6 +714,25 @@ app.get('/api/models/compare', (req, res) => {
     }
 });
 
+// ==================== 训练会话 API ====================
+
+// 获取训练会话列表
+app.get('/api/training/sessions', async (req, res) => {
+    try {
+        const sessions = await realDataService.getTrainingSessions();
+        res.json({
+            success: true,
+            sessions
+        });
+    } catch (error) {
+        console.error('Error getting training sessions:', error);
+        res.status(500).json({
+            success: false,
+            error: '获取训练会话失败'
+        });
+    }
+});
+
 // ==================== 系统监控 API ====================
 
 // API统计
@@ -610,6 +755,23 @@ app.get('/api/monitor/stats', async (req, res) => {
         res.status(500).json({
             success: false,
             error: '获取系统统计失败'
+        });
+    }
+});
+
+// 清理缓存
+app.post('/api/monitor/clear-cache', (req, res) => {
+    try {
+        realDataService.clearCache();
+        res.json({
+            success: true,
+            message: '缓存已清理'
+        });
+    } catch (error) {
+        console.error('Error clearing cache:', error);
+        res.status(500).json({
+            success: false,
+            error: '清理缓存失败'
         });
     }
 });

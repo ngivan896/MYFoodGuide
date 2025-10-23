@@ -287,6 +287,198 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            max-width: 400px;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification-success {
+            background: linear-gradient(135deg, #52c41a, #389e0d);
+        }
+
+        .notification-error {
+            background: linear-gradient(135deg, #ff4d4f, #cf1322);
+        }
+
+        .notification-info {
+            background: linear-gradient(135deg, #1890ff, #096dd9);
+        }
+
+        /* 训练会话样式 */
+        .training-session {
+            background: #262626;
+            border: 1px solid #404040;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .training-session h4 {
+            color: #ffffff;
+            margin: 0 0 16px 0;
+            font-size: 18px;
+        }
+
+        .training-session p {
+            color: #a6a6a6;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .status-initializing {
+            color: #faad14;
+            font-weight: 600;
+        }
+
+        .status-started {
+            color: #1890ff;
+            font-weight: 600;
+        }
+
+        .status-training_started {
+            color: #52c41a;
+            font-weight: 600;
+        }
+
+        .status-completed {
+            color: #52c41a;
+            font-weight: 600;
+        }
+
+        .status-failed {
+            color: #ff4d4f;
+            font-weight: 600;
+        }
+
+        .metrics {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            border-left: 4px solid #52c41a;
+        }
+
+        .metrics h5 {
+            color: #ffffff;
+            margin: 0 0 12px 0;
+            font-size: 16px;
+        }
+
+        .metrics p {
+            margin: 4px 0;
+            color: #a6a6a6;
+        }
+
+        /* Colab选项样式 */
+        .colab-options {
+            background: #262626;
+            border: 1px solid #404040;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .colab-options h4 {
+            color: #ffffff;
+            margin: 0 0 20px 0;
+            font-size: 18px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .option-card {
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .option-card h5 {
+            color: #ffffff;
+            margin: 0 0 12px 0;
+            font-size: 16px;
+        }
+
+        .option-card p {
+            color: #a6a6a6;
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #495057);
+            border: none;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #5a6268, #3d4043);
+        }
+
+        /* Colab说明样式 */
+        .colab-instructions {
+            background: #262626;
+            border: 1px solid #404040;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .colab-instructions h4 {
+            color: #ffffff;
+            margin: 0 0 16px 0;
+            font-size: 18px;
+        }
+
+        .colab-instructions ol {
+            color: #a6a6a6;
+            margin: 16px 0;
+            padding-left: 20px;
+        }
+
+        .colab-instructions li {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+
+        .code-block {
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 12px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-block code {
+            color: #52c41a;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
         .fade-in {
             animation: fadeIn 0.5s ease-out;
         }
@@ -344,22 +536,22 @@
             <div class="stats-grid">
                 <div class="stat-card fade-in">
                     <div class="stat-icon">🤖</div>
-                    <div class="stat-value" id="active-training">3</div>
+                    <div class="stat-value" id="active-training">0</div>
                     <div class="stat-label">活跃训练会话</div>
                 </div>
                 <div class="stat-card fade-in">
                     <div class="stat-icon">📊</div>
-                    <div class="stat-value" id="total-datasets">5</div>
+                    <div class="stat-value" id="total-datasets">0</div>
                     <div class="stat-label">数据集总数</div>
                 </div>
                 <div class="stat-card fade-in">
                     <div class="stat-icon">☁️</div>
-                    <div class="stat-value" id="model-versions">8</div>
+                    <div class="stat-value" id="model-versions">0</div>
                     <div class="stat-label">模型版本</div>
                 </div>
                 <div class="stat-card fade-in">
                     <div class="stat-icon">📈</div>
-                    <div class="stat-value" id="api-calls">1,250</div>
+                    <div class="stat-value" id="api-calls">0</div>
                     <div class="stat-label">API调用次数</div>
                 </div>
             </div>
@@ -382,26 +574,10 @@
             <div class="card fade-in">
                 <h3>🚀 训练会话</h3>
                 <div id="training-sessions">
-                    <div style="margin-bottom: 16px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span>YOLOv8n 基础训练</span>
-                            <span class="status-indicator status-running">🔄 训练中</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 65%;"></div>
-                        </div>
-                        <div style="font-size: 12px; color: #a6a6a6;">进度: 65% | 预计剩余: 2h 30m</div>
-                    </div>
-                    
-                    <div style="margin-bottom: 16px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span>YOLOv8s 高级训练</span>
-                            <span class="status-indicator status-completed">✅ 已完成</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 100%;"></div>
-                        </div>
-                        <div style="font-size: 12px; color: #a6a6a6;">准确率: 92% | 训练时间: 3h 15m</div>
+                    <div style="text-align: center; padding: 40px; color: #a6a6a6;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+                        <div style="font-size: 16px; margin-bottom: 8px;">暂无训练会话</div>
+                        <div style="font-size: 14px;">点击"模型训练"开始您的第一个训练任务</div>
                     </div>
                 </div>
             </div>
@@ -659,7 +835,7 @@
             window.open(downloadUrl, '_blank');
         }
 
-        // 启动训练
+        // 启动训练 - 真正的智能集成
         async function launchTraining() {
             const button = event.target;
             const originalText = button.textContent;
@@ -667,35 +843,202 @@
             button.disabled = true;
             
             try {
+                // 获取训练配置
+                const trainingConfig = {
+                    model_config: {
+                        model_type: 'yolov8n',
+                        epochs: 100,
+                        batch_size: 16,
+                        learning_rate: 0.01,
+                        img_size: 640
+                    },
+                    training_params: {
+                        augment: true,
+                        optimizer: 'AdamW'
+                    }
+                };
+
                 const response = await fetch('http://localhost:5000/api/training/colab/launch', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        template_id: 'yolov8_basic',
-                        config: {
-                            model_type: 'yolov8n',
-                            epochs: 100,
-                            batch_size: 16,
-                            learning_rate: 0.01
-                        }
-                    })
+                    body: JSON.stringify(trainingConfig)
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('训练启动成功！\n\n请下载模板文件并在Google Colab中运行。');
+                    // 显示成功消息
+                    showNotification('🚀 训练启动成功！', 'success');
+                    
+                    // 显示训练会话信息
+                    showTrainingSession(data.session_id, data.template_download_url);
+                    
+                    // 提供两种打开方式
+                    showColabOptions(data.session_id);
+                    
                 } else {
-                    alert(`训练启动失败：${data.error}`);
+                    showNotification(`❌ 训练启动失败：${data.error}`, 'error');
                 }
             } catch (error) {
-                alert(`训练启动失败：${error.message}`);
+                showNotification(`❌ 训练启动失败：${error.message}`, 'error');
             } finally {
                 button.textContent = originalText;
                 button.disabled = false;
             }
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // 显示训练会话信息
+        function showTrainingSession(sessionId, templateDownloadUrl) {
+            const sessionDiv = document.createElement('div');
+            sessionDiv.className = 'training-session';
+            sessionDiv.setAttribute('data-session-id', sessionId);
+            sessionDiv.innerHTML = `
+                <h4>🎯 训练会话已创建</h4>
+                <p><strong>会话ID:</strong> ${sessionId}</p>
+                <p><strong>状态:</strong> <span class="status-initializing">正在初始化...</span></p>
+                <p><strong>下一步:</strong> 请在Google Colab中运行训练代码</p>
+                <button onclick="checkTrainingStatus('${sessionId}')" class="btn btn-small">📊 查看状态</button>
+                <button onclick="downloadTemplate('${sessionId}')" class="btn btn-small">📥 下载模板</button>
+            `;
+            
+            // 添加到训练页面
+            const trainingContent = document.getElementById('training');
+            trainingContent.appendChild(sessionDiv);
+        }
+
+        // 显示Colab选项
+        function showColabOptions(sessionId) {
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'colab-options';
+            optionsDiv.innerHTML = `
+                <h4>🚀 选择启动方式</h4>
+                <div class="options-grid">
+                    <div class="option-card">
+                        <h5>📱 方式1: 自动打开Colab</h5>
+                        <p>系统将自动打开Google Colab并加载训练代码</p>
+                        <button onclick="openColabAuto('${sessionId}')" class="btn btn-primary">🚀 自动打开</button>
+                    </div>
+                    <div class="option-card">
+                        <h5>📥 方式2: 下载模板</h5>
+                        <p>下载训练模板文件，手动上传到Google Colab</p>
+                        <button onclick="downloadTemplate('${sessionId}')" class="btn btn-secondary">📥 下载模板</button>
+                    </div>
+                </div>
+            `;
+            
+            // 添加到训练页面
+            const trainingContent = document.getElementById('training');
+            trainingContent.appendChild(optionsDiv);
+        }
+
+        // 自动打开Colab
+        function openColabAuto(sessionId) {
+            // 打开Google Colab
+            const colabUrl = 'https://colab.research.google.com/';
+            window.open(colabUrl, '_blank');
+            
+            // 显示使用说明
+            showNotification('📱 Google Colab已打开！请按照以下步骤操作：', 'info');
+            
+            setTimeout(() => {
+                const instructions = document.createElement('div');
+                instructions.className = 'colab-instructions';
+                instructions.innerHTML = `
+                    <h4>📋 在Google Colab中的操作步骤：</h4>
+                    <ol>
+                        <li>在Colab中点击"文件" → "新建笔记本"</li>
+                        <li>复制以下代码到第一个单元格：</li>
+                        <div class="code-block">
+                            <code>!wget -O nutriscan_training.ipynb "http://localhost:5000/api/training/colab/template/${sessionId}/download"</code>
+                        </div>
+                        <li>运行代码下载模板</li>
+                        <li>打开下载的notebook文件</li>
+                        <li>点击"运行时" → "运行全部"开始训练</li>
+                    </ol>
+                    <button onclick="copyDownloadCommand('${sessionId}')" class="btn btn-small">📋 复制下载命令</button>
+                `;
+                
+                const trainingContent = document.getElementById('training');
+                trainingContent.appendChild(instructions);
+            }, 2000);
+        }
+
+        // 复制下载命令
+        function copyDownloadCommand(sessionId) {
+            const command = `!wget -O nutriscan_training.ipynb "http://localhost:5000/api/training/colab/template/${sessionId}/download"`;
+            navigator.clipboard.writeText(command).then(() => {
+                showNotification('📋 下载命令已复制到剪贴板！', 'success');
+            }).catch(() => {
+                showNotification('❌ 复制失败，请手动复制命令', 'error');
+            });
+        }
+
+        // 检查训练状态
+        async function checkTrainingStatus(sessionId) {
+            try {
+                const response = await fetch(`http://localhost:5000/api/training/colab/status/${sessionId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const session = data.session;
+                    updateSessionStatus(sessionId, session.status, session.metrics);
+                }
+            } catch (error) {
+                showNotification(`❌ 获取状态失败：${error.message}`, 'error');
+            }
+        }
+
+        // 更新会话状态显示
+        function updateSessionStatus(sessionId, status, metrics) {
+            const statusElements = document.querySelectorAll(`[data-session-id="${sessionId}"]`);
+            statusElements.forEach(element => {
+                const statusSpan = element.querySelector('.status-initializing');
+                if (statusSpan) {
+                    statusSpan.textContent = status;
+                    statusSpan.className = `status-${status}`;
+                }
+                
+                if (metrics && Object.keys(metrics).length > 0) {
+                    const metricsDiv = element.querySelector('.metrics') || document.createElement('div');
+                    metricsDiv.className = 'metrics';
+                    metricsDiv.innerHTML = `
+                        <h5>📊 训练指标</h5>
+                        <p>准确率: ${(metrics.accuracy * 100).toFixed(2)}%</p>
+                        <p>精确度: ${(metrics.precision * 100).toFixed(2)}%</p>
+                        <p>召回率: ${(metrics.recall * 100).toFixed(2)}%</p>
+                    `;
+                    element.appendChild(metricsDiv);
+                }
+            });
+        }
+
+        // 下载模板
+        function downloadTemplate(sessionId) {
+            const downloadUrl = `http://localhost:5000/api/training/colab/template/${sessionId}/download`;
+            window.open(downloadUrl, '_blank');
+            showNotification('📥 正在下载训练模板...', 'info');
         }
 
         // 初始化图表
