@@ -183,14 +183,10 @@ class RealDataService {
 
     // 获取系统统计
     async getSystemStats() {
-        const cacheKey = 'system_stats';
-        const cached = this.getCachedData(cacheKey);
-        if (cached) return cached;
-
         try {
             // 获取真实统计信息
             const stats = {
-                api_calls: 0,
+                api_calls: this.getRealAPICallCount(),
                 errors: 0,
                 uptime: Date.now(),
                 active_sessions: 0,
@@ -204,8 +200,9 @@ class RealDataService {
             stats.completed_sessions = trainingSessions.filter(s => s.status === 'completed').length;
             stats.ready_sessions = trainingSessions.filter(s => s.status === 'ready').length;
 
-            // 获取数据集统计
-            const datasets = await this.getDatasets();
+            // 获取数据集统计 - 不使用缓存，确保数据最新
+            const datasetsResponse = await this.getDatasets();
+            const datasets = datasetsResponse.datasets || datasetsResponse || [];
             stats.total_datasets = Array.isArray(datasets) ? datasets.length : 0;
             stats.total_images = Array.isArray(datasets) ? datasets.reduce((sum, dataset) => sum + (dataset.file_count || 0), 0) : 0;
 
@@ -214,10 +211,8 @@ class RealDataService {
             stats.total_models = models.length;
             stats.active_models = models.filter(m => m.status === 'active').length;
 
-            // 计算API调用次数（基于缓存命中率）
-            stats.api_calls = this.cache.size * 10; // 估算API调用次数
-
-            this.setCachedData(cacheKey, stats);
+            // 缓存结果
+            this.setCachedData('system_stats', stats);
             return stats;
         } catch (error) {
             console.error('Error fetching system stats:', error);
@@ -384,30 +379,8 @@ class RealDataService {
     }
 
     getMockDatasets() {
-        return [
-            {
-                id: 'dataset_1',
-                name: 'Malaysian Food Dataset v1',
-                description: '包含20种马来西亚食物的数据集',
-                type: 'yolo',
-                source: 'roboflow',
-                status: 'ready',
-                created_at: '2024-01-10T09:00:00Z',
-                file_count: 1000,
-                total_size: '2.5GB'
-            },
-            {
-                id: 'dataset_2',
-                name: 'Custom Food Dataset',
-                description: '用户自定义食物数据集',
-                type: 'yolo',
-                source: 'local',
-                status: 'uploading',
-                created_at: '2024-01-15T14:30:00Z',
-                file_count: 500,
-                total_size: '1.2GB'
-            }
-        ];
+        // 返回空数组，确保只显示真实数据
+        return [];
     }
 
     getMockModels() {
@@ -439,13 +412,40 @@ class RealDataService {
 
     getMockSystemStats() {
         return {
-            api_calls: 1250,
-            errors: 5,
-            uptime: Date.now() - 86400000, // 1天前启动
-            active_sessions: 2,
-            memory_usage: '256MB',
-            cpu_usage: '15%'
+            api_calls: 0,
+            errors: 0,
+            uptime: Date.now(),
+            active_sessions: 0,
+            completed_sessions: 0,
+            ready_sessions: 0,
+            total_datasets: 0,
+            total_images: 0,
+            total_models: 0,
+            active_models: 0,
+            memory_usage: this.getMemoryUsage(),
+            cpu_usage: this.getCPUUsage()
         };
+    }
+
+    /**
+     * 获取真实的API调用次数
+     */
+    getRealAPICallCount() {
+        // 从系统统计文件读取真实的API调用次数
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const systemStatsFile = path.join(__dirname, '..', 'data', 'system_stats.json');
+            
+            if (fs.existsSync(systemStatsFile)) {
+                const stats = JSON.parse(fs.readFileSync(systemStatsFile, 'utf8'));
+                return stats.api_calls || 0;
+            }
+        } catch (error) {
+            console.error('Error reading API call count:', error);
+        }
+        
+        return 0;
     }
 }
 

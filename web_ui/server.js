@@ -12,6 +12,12 @@ const apiConfig = require('./config/api-config');
 const ColabTemplateGenerator = require('./services/colab-template-generator');
 const templateGenerator = new ColabTemplateGenerator();
 
+// 导入训练自动化服务
+const trainingAutomation = require('./services/training-automation-service');
+
+// 导入营养分析服务
+const nutritionAnalysis = require('./services/nutrition-analysis-service');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -43,6 +49,22 @@ const systemStatsFile = initDataFile('system_stats.json', {
     api_calls: 0,
     errors: 0,
     uptime: Date.now()
+});
+
+// API调用计数器 - 初始化为0，稍后从文件加载
+let apiCallCounter = 0;
+
+// API调用跟踪中间件
+app.use('/api', (req, res, next) => {
+    apiCallCounter++;
+    console.log(`📊 API调用 #${apiCallCounter}: ${req.method} ${req.path}`);
+    
+    // 保存到文件
+    const stats = readJsonFile(systemStatsFile);
+    stats.api_calls = apiCallCounter;
+    writeJsonFile(systemStatsFile, stats);
+    
+    next();
 });
 
 // 工具函数
@@ -631,7 +653,7 @@ app.get('/api/datasets/analyze/:datasetId', (req, res) => {
     }
 });
 
-// ==================== 模型管理 API ====================
+// ==================== 模型版本管理 API ====================
 
 // 获取模型版本
 app.get('/api/models/versions', async (req, res) => {
@@ -675,29 +697,39 @@ app.post('/api/training/deploy', (req, res) => {
 });
 
 // 模型性能对比
-app.get('/api/models/compare', (req, res) => {
+app.get('/api/models/compare', async (req, res) => {
     try {
         const { model_ids } = req.query;
         
-        // 模拟性能对比数据
+        // 获取所有模型进行对比
+        const models = await realDataService.getModels();
+        
+        // 如果指定了特定模型ID，只对比这些模型
+        let modelsToCompare = models;
+        if (model_ids) {
+            const ids = model_ids.split(',');
+            modelsToCompare = models.filter(model => ids.includes(model.id));
+        }
+        
+        // 生成对比数据
         const comparison = {
-            models: [
-                {
-                    id: 'model_v1',
-                    name: 'YOLOv8n',
-                    accuracy: 0.85,
-                    inference_time: 15,
-                    model_size: 6.2
-                },
-                {
-                    id: 'model_v2',
-                    name: 'YOLOv8s',
-                    accuracy: 0.89,
-                    inference_time: 22,
-                    model_size: 21.5
-                }
-            ],
-            metrics: ['accuracy', 'inference_time', 'model_size']
+            models: modelsToCompare.map(model => ({
+                id: model.id,
+                name: model.name,
+                version: model.version,
+                accuracy: model.accuracy || 0.85,
+                inference_time: model.inference_time || 15,
+                model_size: model.file_size || 6.2,
+                classes: model.classes || 20,
+                status: model.status,
+                created_at: model.created_at
+            })),
+            metrics: ['accuracy', 'inference_time', 'model_size', 'classes'],
+            summary: {
+                best_accuracy: Math.max(...modelsToCompare.map(m => m.accuracy || 0.85)),
+                fastest_inference: Math.min(...modelsToCompare.map(m => m.inference_time || 15)),
+                smallest_size: Math.min(...modelsToCompare.map(m => m.file_size || 6.2))
+            }
         };
         
         res.json({
@@ -710,6 +742,350 @@ app.get('/api/models/compare', (req, res) => {
         res.status(500).json({
             success: false,
             error: '模型对比失败'
+        });
+    }
+});
+
+// 模型版本管理
+app.post('/api/models/version', (req, res) => {
+    try {
+        const { model_id, version_name, description, performance_data } = req.body;
+        
+        const models = readJsonFile(modelsFile);
+        const versionId = uuidv4();
+        const timestamp = new Date().toISOString();
+        
+        if (!models[model_id]) {
+            return res.status(404).json({
+                success: false,
+                error: '模型不存在'
+            });
+        }
+        
+        // 创建新版本
+        const newVersion = {
+            id: versionId,
+            model_id: model_id,
+            version_name: version_name || `v${Object.keys(models[model_id].versions || {}).length + 1}`,
+            description: description || '',
+            performance_data: performance_data || {},
+            created_at: timestamp,
+            status: 'active'
+        };
+        
+        // 更新模型版本
+        if (!models[model_id].versions) {
+            models[model_id].versions = {};
+        }
+        models[model_id].versions[versionId] = newVersion;
+        models[model_id].updated_at = timestamp;
+        
+        writeJsonFile(modelsFile, models);
+        
+        res.json({
+            success: true,
+            version: newVersion,
+            message: '模型版本创建成功'
+        });
+        
+    } catch (error) {
+        console.error('Error creating model version:', error);
+        res.status(500).json({
+            success: false,
+            error: '创建模型版本失败'
+        });
+    }
+});
+
+// 获取模型版本历史
+app.get('/api/models/:modelId/versions', (req, res) => {
+    try {
+        const { modelId } = req.params;
+        const models = readJsonFile(modelsFile);
+        
+        if (!models[modelId]) {
+            return res.status(404).json({
+                success: false,
+                error: '模型不存在'
+            });
+        }
+        
+        const versions = models[modelId].versions || {};
+        
+        res.json({
+            success: true,
+            versions: Object.values(versions).sort((a, b) => 
+                new Date(b.created_at) - new Date(a.created_at)
+            )
+        });
+        
+    } catch (error) {
+        console.error('Error getting model versions:', error);
+        res.status(500).json({
+            success: false,
+            error: '获取模型版本失败'
+        });
+    }
+});
+
+// 模型回滚
+app.post('/api/models/:modelId/rollback', (req, res) => {
+    try {
+        const { modelId } = req.params;
+        const { version_id } = req.body;
+        
+        const models = readJsonFile(modelsFile);
+        
+        if (!models[modelId] || !models[modelId].versions || !models[modelId].versions[version_id]) {
+            return res.status(404).json({
+                success: false,
+                error: '模型或版本不存在'
+            });
+        }
+        
+        // 将所有版本设为非活跃状态
+        Object.keys(models[modelId].versions).forEach(vid => {
+            models[modelId].versions[vid].status = 'inactive';
+        });
+        
+        // 激活指定版本
+        models[modelId].versions[version_id].status = 'active';
+        models[modelId].versions[version_id].rollback_at = new Date().toISOString();
+        
+        writeJsonFile(modelsFile, models);
+        
+        res.json({
+            success: true,
+            message: '模型回滚成功',
+            active_version: models[modelId].versions[version_id]
+        });
+        
+    } catch (error) {
+        console.error('Error rolling back model:', error);
+        res.status(500).json({
+            success: false,
+            error: '模型回滚失败'
+        });
+    }
+});
+
+// ==================== 训练流程自动化 API ====================
+
+// 数据预处理
+app.post('/api/training/preprocess', async (req, res) => {
+    try {
+        const { dataset_config } = req.body;
+        
+        if (!dataset_config) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少数据集配置'
+            });
+        }
+        
+        const result = await trainingAutomation.preprocessDataset(dataset_config);
+        
+        res.json({
+            success: true,
+            preprocessing_id: result.id,
+            status: result.status,
+            message: '数据预处理已开始'
+        });
+        
+    } catch (error) {
+        console.error('Error preprocessing dataset:', error);
+        res.status(500).json({
+            success: false,
+            error: '数据预处理失败'
+        });
+    }
+});
+
+// 获取预处理状态
+app.get('/api/training/preprocess/:preprocessingId', async (req, res) => {
+    try {
+        const { preprocessingId } = req.params;
+        const results = await trainingAutomation.getPreprocessingResults();
+        
+        if (!results[preprocessingId]) {
+            return res.status(404).json({
+                success: false,
+                error: '预处理任务不存在'
+            });
+        }
+        
+        res.json({
+            success: true,
+            result: results[preprocessingId]
+        });
+        
+    } catch (error) {
+        console.error('Error getting preprocessing status:', error);
+        res.status(500).json({
+            success: false,
+            error: '获取预处理状态失败'
+        });
+    }
+});
+
+// 模型部署
+app.post('/api/training/deploy', async (req, res) => {
+    try {
+        const { model_id, deployment_type, target_platform, target_format } = req.body;
+        
+        if (!model_id) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少模型ID'
+            });
+        }
+        
+        const deploymentConfig = {
+            model_id,
+            deployment_type: deployment_type || 'production',
+            target_platform: target_platform || 'mobile',
+            target_format: target_format || 'tflite'
+        };
+        
+        const result = await trainingAutomation.deployModel(deploymentConfig);
+        
+        res.json({
+            success: true,
+            deployment_id: result.id,
+            status: result.status,
+            message: '模型部署已开始'
+        });
+        
+    } catch (error) {
+        console.error('Error deploying model:', error);
+        res.status(500).json({
+            success: false,
+            error: '模型部署失败'
+        });
+    }
+});
+
+// 获取部署状态
+app.get('/api/training/deploy/:deploymentId', async (req, res) => {
+    try {
+        const { deploymentId } = req.params;
+        const results = await trainingAutomation.getDeploymentResults();
+        
+        if (!results[deploymentId]) {
+            return res.status(404).json({
+                success: false,
+                error: '部署任务不存在'
+            });
+        }
+        
+        res.json({
+            success: true,
+            result: results[deploymentId]
+        });
+        
+    } catch (error) {
+        console.error('Error getting deployment status:', error);
+        res.status(500).json({
+            success: false,
+            error: '获取部署状态失败'
+        });
+    }
+});
+
+// ==================== 营养分析 API ====================
+
+// 分析单个食物营养
+app.post('/api/nutrition/analyze', async (req, res) => {
+    try {
+        const { food_name, language = 'zh-CN' } = req.body;
+        
+        if (!food_name) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少食物名称'
+            });
+        }
+        
+        const nutritionInfo = await nutritionAnalysis.analyzeFoodNutrition(food_name, language);
+        
+        res.json({
+            success: true,
+            nutrition_info: nutritionInfo
+        });
+        
+    } catch (error) {
+        console.error('Error analyzing nutrition:', error);
+        res.status(500).json({
+            success: false,
+            error: '营养分析失败'
+        });
+    }
+});
+
+// 批量分析食物营养
+app.post('/api/nutrition/analyze-batch', async (req, res) => {
+    try {
+        const { food_names, language = 'zh-CN' } = req.body;
+        
+        if (!food_names || !Array.isArray(food_names)) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少食物名称列表'
+            });
+        }
+        
+        const nutritionResults = await nutritionAnalysis.analyzeMultipleFoods(food_names, language);
+        
+        res.json({
+            success: true,
+            nutrition_results: nutritionResults,
+            total_analyzed: food_names.length
+        });
+        
+    } catch (error) {
+        console.error('Error analyzing batch nutrition:', error);
+        res.status(500).json({
+            success: false,
+            error: '批量营养分析失败'
+        });
+    }
+});
+
+// 测试营养分析服务
+app.get('/api/nutrition/test', async (req, res) => {
+    try {
+        const testResult = await nutritionAnalysis.testConnection();
+        
+        res.json({
+            success: true,
+            test_result: testResult,
+            cache_stats: nutritionAnalysis.getCacheStats()
+        });
+        
+    } catch (error) {
+        console.error('Error testing nutrition service:', error);
+        res.status(500).json({
+            success: false,
+            error: '营养分析服务测试失败'
+        });
+    }
+});
+
+// 清理营养分析缓存
+app.post('/api/nutrition/clear-cache', (req, res) => {
+    try {
+        nutritionAnalysis.clearCache();
+        
+        res.json({
+            success: true,
+            message: '营养分析缓存已清理'
+        });
+        
+    } catch (error) {
+        console.error('Error clearing nutrition cache:', error);
+        res.status(500).json({
+            success: false,
+            error: '清理缓存失败'
         });
     }
 });
@@ -746,7 +1122,7 @@ app.get('/api/monitor/stats', async (req, res) => {
             stats: {
                 ...stats,
                 uptime: Math.floor(uptime / 1000), // 秒
-                api_calls: (stats.api_calls || 0) + 1
+                api_calls: apiCallCounter // 使用真实的API调用计数
             }
         });
         
@@ -908,6 +1284,16 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 训练控制台界面
+app.get('/training', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'training.html'));
+});
+
+// 真实数据仪表盘
+app.get('/real-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'real-dashboard.html'));
+});
+
 // 如果请求的是前端路由，返回API信息
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) {
@@ -933,6 +1319,15 @@ app.get('*', (req, res) => {
 
 // 启动服务器
 app.listen(PORT, () => {
+    // 从文件加载API调用计数
+    try {
+        const stats = readJsonFile(systemStatsFile);
+        apiCallCounter = stats.api_calls || 0;
+        console.log(`📊 已加载API调用计数: ${apiCallCounter}`);
+    } catch (error) {
+        console.log('⚠️ 无法加载API调用计数，从0开始');
+    }
+    
     console.log(`🚀 NutriScan Backend Dashboard 服务器运行在端口 ${PORT}`);
     console.log(`📊 访问地址: http://localhost:${PORT}`);
     console.log(`🔧 API文档: http://localhost:${PORT}/api`);

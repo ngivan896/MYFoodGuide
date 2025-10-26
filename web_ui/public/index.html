@@ -367,6 +367,85 @@
             font-weight: 600;
         }
 
+        /* 空状态样式 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a6a6a6;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            color: #ffffff;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .empty-state p {
+            color: #a6a6a6;
+            font-size: 0.9rem;
+        }
+
+        .empty-chart {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            text-align: center;
+            color: #a6a6a6;
+        }
+
+        .empty-chart .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .empty-chart h3 {
+            color: #ffffff;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .empty-chart p {
+            color: #a6a6a6;
+            font-size: 0.85rem;
+        }
+
+        /* 数据状态指示器 */
+        .data-status-indicator {
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-badge.real-data {
+            background: rgba(82, 196, 26, 0.2);
+            color: #52c41a;
+            border: 1px solid rgba(82, 196, 26, 0.3);
+        }
+
+        .last-update {
+            color: #a6a6a6;
+            font-size: 0.85rem;
+        }
+
         .metrics {
             background: #1a1a1a;
             border-radius: 8px;
@@ -520,6 +599,10 @@
         <div class="header fade-in">
             <h1>🍜 NutriScan Dashboard</h1>
             <p>马来西亚食物智能识别系统管理平台</p>
+            <div class="data-status-indicator">
+                <span class="status-badge real-data">✅ 真实数据</span>
+                <span class="last-update">最后更新: <span id="last-update-time">加载中...</span></span>
+            </div>
         </div>
 
         <div class="nav-tabs">
@@ -1041,23 +1124,199 @@
             showNotification('📥 正在下载训练模板...', 'info');
         }
 
-        // 初始化图表
-        function initCharts() {
-            // 准确率趋势图
-            const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
-            new Chart(accuracyCtx, {
+        // 加载真实数据
+        async function loadRealData() {
+            try {
+                // 加载系统统计
+                const statsResponse = await fetch('/api/monitor/stats');
+                const statsData = await statsResponse.json();
+                
+                // 加载训练会话
+                const sessionsResponse = await fetch('/api/training/sessions');
+                const sessionsData = await sessionsResponse.json();
+                
+                // 加载数据集
+                const datasetsResponse = await fetch('/api/datasets');
+                const datasetsData = await datasetsResponse.json();
+                
+                // 更新页面数据
+                updateDashboardData(statsData.stats, sessionsData.sessions || [], datasetsData.datasets || []);
+                
+                // 更新最后更新时间
+                const lastUpdateElement = document.getElementById('last-update-time');
+                if (lastUpdateElement) {
+                    lastUpdateElement.textContent = new Date().toLocaleString('zh-CN');
+                }
+                
+            } catch (error) {
+                console.error('加载真实数据失败:', error);
+                showNotification('⚠️ 加载数据失败，显示空状态', 'warning');
+                
+                // 更新错误状态
+                const lastUpdateElement = document.getElementById('last-update-time');
+                if (lastUpdateElement) {
+                    lastUpdateElement.textContent = '加载失败';
+                }
+            }
+        }
+
+        // 更新仪表盘数据
+        function updateDashboardData(stats, sessions, datasets) {
+            // 更新关键指标
+            updateKeyMetrics(stats);
+            
+            // 更新训练会话
+            updateTrainingSessions(sessions);
+            
+            // 更新数据集信息
+            updateDatasetsInfo(datasets);
+            
+            // 初始化图表（使用真实数据）
+            initChartsWithRealData(stats, sessions, datasets);
+        }
+
+        // 更新关键指标
+        function updateKeyMetrics(stats) {
+            const metrics = [
+                { id: 'active-sessions', value: stats?.active_sessions || 0 },
+                { id: 'total-datasets', value: stats?.total_datasets || 0 },
+                { id: 'total-models', value: stats?.total_models || 0 },
+                { id: 'api-calls', value: stats?.api_calls || 0 }
+            ];
+            
+            metrics.forEach(metric => {
+                const element = document.getElementById(metric.id);
+                if (element) {
+                    element.textContent = metric.value;
+                }
+            });
+        }
+
+        // 更新训练会话
+        function updateTrainingSessions(sessions) {
+            const sessionsContainer = document.querySelector('.sessions-list');
+            if (!sessionsContainer) return;
+            
+            if (sessions.length === 0) {
+                sessionsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <h3>暂无训练会话</h3>
+                        <p>点击"模型训练"开始您的第一个训练任务</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            sessionsContainer.innerHTML = sessions.map(session => `
+                <div class="session-item" data-session-id="${session.id}">
+                    <div class="session-header">
+                        <h4>${session.name}</h4>
+                        <span class="status-${session.status}">${session.status}</span>
+                    </div>
+                    <div class="session-details">
+                        <p>进度: ${session.progress || 0}%</p>
+                        <p>创建时间: ${new Date(session.created_at).toLocaleString('zh-CN')}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 更新数据集信息
+        function updateDatasetsInfo(datasets) {
+            const datasetsContainer = document.querySelector('.datasets-info');
+            if (!datasetsContainer) return;
+            
+            if (datasets.length === 0) {
+                datasetsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📁</div>
+                        <h3>暂无数据集</h3>
+                        <p>请先上传或同步数据集</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            datasetsContainer.innerHTML = datasets.map(dataset => `
+                <div class="dataset-item">
+                    <h4>${dataset.name}</h4>
+                    <p>文件数: ${dataset.file_count || 0}</p>
+                    <p>状态: ${dataset.status}</p>
+                </div>
+            `).join('');
+        }
+
+        // 使用真实数据初始化图表
+        function initChartsWithRealData(stats, sessions, datasets) {
+            console.log('🔍 初始化图表，数据:', { stats, sessions, datasets });
+            
+            // 准确率趋势图 - 如果没有训练数据，显示空状态
+            console.log('🔍 开始查找accuracyChart元素...');
+            const accuracyCanvas = document.getElementById('accuracyChart');
+            console.log('🔍 accuracyCanvas:', accuracyCanvas);
+            console.log('🔍 DOM中所有canvas元素:', document.querySelectorAll('canvas'));
+            if (!accuracyCanvas) {
+                console.error('❌ 找不到accuracyChart元素');
+                console.log('🔍 当前DOM状态:', document.readyState);
+                // 不return，继续执行数据集分布图
+            } else {
+                // 销毁现有的准确率图表实例
+                if (window.accuracyChartInstance) {
+                    window.accuracyChartInstance.destroy();
+                    window.accuracyChartInstance = null;
+                }
+                
+                const accuracyCtx = accuracyCanvas.getContext('2d');
+                if (sessions.length === 0) {
+                accuracyCtx.canvas.style.display = 'none';
+                // 不删除canvas元素，只隐藏它
+                const parentElement = document.getElementById('accuracyChart').parentElement;
+                parentElement.innerHTML = `
+                    <div class="empty-chart">
+                        <div class="empty-icon">📈</div>
+                        <h3>暂无训练数据</h3>
+                        <p>开始训练后显示准确率趋势</p>
+                    </div>
+                `;
+                // 重新添加canvas元素
+                parentElement.innerHTML += '<canvas id="accuracyChart"></canvas>';
+            }
+            
+            // 如果有训练数据，显示真实图表
+            // 检查是否有真实的训练准确率数据
+            const hasRealAccuracyData = sessions.some(session => 
+                session.metrics && session.metrics.accuracy && session.metrics.accuracy.length > 0
+            );
+            
+            if (!hasRealAccuracyData) {
+                // 没有真实准确率数据，显示空状态
+                accuracyCtx.canvas.style.display = 'none';
+                const parentElement = document.getElementById('accuracyChart').parentElement;
+                parentElement.innerHTML = `
+                    <div class="empty-chart">
+                        <div class="empty-icon">📈</div>
+                        <h3>暂无准确率数据</h3>
+                        <p>训练完成后显示真实准确率趋势</p>
+                    </div>
+                `;
+                // 重新添加canvas元素
+                parentElement.innerHTML += '<canvas id="accuracyChart"></canvas>';
+            } else {
+                // 使用真实准确率数据
+            window.accuracyChartInstance = new Chart(accuracyCtx, {
                 type: 'line',
                 data: {
                     labels: ['Epoch 1', 'Epoch 20', 'Epoch 40', 'Epoch 60', 'Epoch 80', 'Epoch 100'],
                     datasets: [{
                         label: '训练准确率',
-                        data: [0.45, 0.68, 0.78, 0.85, 0.89, 0.92],
+                        data: sessions[0].metrics.accuracy || [0.45, 0.68, 0.78, 0.85, 0.89, 0.92],
                         borderColor: '#1890ff',
                         backgroundColor: 'rgba(24, 144, 255, 0.1)',
                         tension: 0.4,
                     }, {
                         label: '验证准确率',
-                        data: [0.42, 0.65, 0.75, 0.82, 0.86, 0.89],
+                        data: sessions[0].metrics.val_accuracy || [0.42, 0.65, 0.75, 0.82, 0.86, 0.89],
                         borderColor: '#52c41a',
                         backgroundColor: 'rgba(82, 196, 26, 0.1)',
                         tension: 0.4,
@@ -1083,16 +1342,47 @@
                     }
                 }
             });
+            }
+            }
 
-            // 数据集分布图
-            const datasetCtx = document.getElementById('datasetChart').getContext('2d');
-            new Chart(datasetCtx, {
+            // 数据集分布图 - 使用真实数据
+            console.log('🔍 数据集分布图调试:', datasets);
+            const datasetCanvas = document.getElementById('datasetChart');
+            if (!datasetCanvas) {
+                console.error('❌ 找不到datasetChart元素');
+                return;
+            }
+            
+            // 销毁现有的图表实例
+            if (window.datasetChartInstance) {
+                window.datasetChartInstance.destroy();
+                window.datasetChartInstance = null;
+            }
+            
+            const datasetCtx = datasetCanvas.getContext('2d');
+            if (datasets.length === 0) {
+                datasetCtx.canvas.style.display = 'none';
+                document.getElementById('datasetChart').parentElement.innerHTML = `
+                    <div class="empty-chart">
+                        <div class="empty-icon">📊</div>
+                        <h3>暂无数据集</h3>
+                        <p>上传数据集后显示分布信息</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 如果有数据集，显示真实分布
+            const datasetLabels = datasets.map(d => d.name);
+            const datasetData = datasets.map(d => d.file_count || 0);
+            
+            window.datasetChartInstance = new Chart(datasetCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Nasi Lemak', 'Roti Canai', 'Char Kway Teow', 'Bak Kut Teh', '其他'],
+                    labels: datasetLabels,
                     datasets: [{
-                        data: [15, 12, 10, 8, 55],
-                        backgroundColor: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1'],
+                        data: datasetData,
+                        backgroundColor: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96'],
                         borderWidth: 0,
                     }]
                 },
@@ -1110,16 +1400,12 @@
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
-            initCharts();
+            // 加载真实数据而不是硬编码数据
+            loadRealData();
+            showNotification('🎉 欢迎使用NutriScan Dashboard！正在加载真实数据...', 'success');
             
-            // 模拟实时数据更新
-            setInterval(() => {
-                const apiCallsElement = document.getElementById('api-calls');
-                if (apiCallsElement) {
-                    const currentCalls = parseInt(apiCallsElement.textContent.replace(',', ''));
-                    apiCallsElement.textContent = (currentCalls + Math.floor(Math.random() * 5)).toLocaleString();
-                }
-            }, 5000);
+            // 每30秒自动刷新真实数据
+            setInterval(loadRealData, 30000);
         });
     </script>
 </body>

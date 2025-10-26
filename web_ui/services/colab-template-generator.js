@@ -21,19 +21,36 @@ class ColabTemplateGenerator {
             patience: trainingConfig.patience || 20,
             save_period: trainingConfig.save_period || 10,
             session_id: trainingConfig.session_id || this.generateSessionId(),
-            dashboard_url: trainingConfig.dashboard_url || 'http://localhost:5000'
+            dashboard_url: trainingConfig.dashboard_url || 'http://localhost:5000',
+            dataset_id: trainingConfig.dataset_id || 'default_dataset',
+            augment: trainingConfig.augment || true,
+            optimizer: trainingConfig.optimizer || 'AdamW',
+            loss_function: trainingConfig.loss_function || 'BCE'
         };
 
+        // 根据模型类型调整默认参数
+        if (config.model_type === 'yolov8s') {
+            config.batch_size = Math.min(config.batch_size, 12);
+            config.learning_rate = Math.min(config.learning_rate, 0.005);
+        } else if (config.model_type === 'yolov8m') {
+            config.batch_size = Math.min(config.batch_size, 8);
+            config.learning_rate = Math.min(config.learning_rate, 0.003);
+        }
+
         return this.templateBase
-            .replace('{{MODEL_TYPE}}', config.model_type)
-            .replace('{{EPOCHS}}', config.epochs)
-            .replace('{{BATCH_SIZE}}', config.batch_size)
-            .replace('{{LEARNING_RATE}}', config.learning_rate)
-            .replace('{{IMG_SIZE}}', config.img_size)
-            .replace('{{PATIENCE}}', config.patience)
-            .replace('{{SAVE_PERIOD}}', config.save_period)
-            .replace('{{SESSION_ID}}', config.session_id)
-            .replace('{{DASHBOARD_URL}}', config.dashboard_url);
+            .replace(/{{MODEL_TYPE}}/g, config.model_type)
+            .replace(/{{EPOCHS}}/g, config.epochs)
+            .replace(/{{BATCH_SIZE}}/g, config.batch_size)
+            .replace(/{{LEARNING_RATE}}/g, config.learning_rate)
+            .replace(/{{IMG_SIZE}}/g, config.img_size)
+            .replace(/{{PATIENCE}}/g, config.patience)
+            .replace(/{{SAVE_PERIOD}}/g, config.save_period)
+            .replace(/{{SESSION_ID}}/g, config.session_id)
+            .replace(/{{DASHBOARD_URL}}/g, config.dashboard_url)
+            .replace(/{{DATASET_ID}}/g, config.dataset_id)
+            .replace(/{{AUGMENT}}/g, config.augment)
+            .replace(/{{OPTIMIZER}}/g, config.optimizer)
+            .replace(/{{LOSS_FUNCTION}}/g, config.loss_function);
     }
 
     /**
@@ -137,21 +154,29 @@ class ColabTemplateGenerator {
     "    "learning_rate": {{LEARNING_RATE}},\n",
     "    "img_size": {{IMG_SIZE}},\n",
     "    "patience": {{PATIENCE}},\n",
-    "    "save_period": {{SAVE_PERIOD}}\n",
+    "    "save_period": {{SAVE_PERIOD}},\n",
+    "    "augment": {{AUGMENT}},\n",
+    "    "optimizer": "{{OPTIMIZER}}",\n",
+    "    "loss_function": "{{LOSS_FUNCTION}}"\n",
     "}\n",
     "\n",
     "# 输出目录\n",
     "OUTPUT_DIR = f"/content/nutriscan_training_{SESSION_ID}"\n",
     "os.makedirs(OUTPUT_DIR, exist_ok=True)\n",
     "\n",
+    "# 创建日志目录\n",
+    "LOG_DIR = os.path.join(OUTPUT_DIR, "logs")\n",
+    "os.makedirs(LOG_DIR, exist_ok=True)\n",
+    "\n",
     "print("✅ 配置参数设置完成！")\n",
     "print(f"📊 训练配置: {TRAINING_CONFIG}")\n",
     "print(f"🆔 会话ID: {SESSION_ID}")\n",
+    "print(f"📁 输出目录: {OUTPUT_DIR}")\n",
     "\n",
     "# 通知Dashboard训练开始\n",
     "try:\n",
     "    requests.post(f"{DASHBOARD_URL}/api/training/colab/status/{SESSION_ID}", \n",
-    "                 json={"status": "started", "timestamp": datetime.now().isoformat()})\n",
+    "                 json={"status": "started", "timestamp": datetime.now().isoformat(), "config": TRAINING_CONFIG})\n",
     "    print("✅ 已通知Dashboard训练开始")\n",
     "except:\n",
     "    print("⚠️ 无法连接到Dashboard，继续训练...")"
