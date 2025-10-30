@@ -1279,22 +1279,12 @@ app.post('/api/config/test', async (req, res) => {
 
 // ==================== 前端路由 ====================
 
-// 提供HTML界面
+// 根路径加载主dashboard
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 训练控制台界面
-app.get('/training', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'training.html'));
-});
-
-// 真实数据仪表盘
-app.get('/real-dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'real-dashboard.html'));
-});
-
-// 如果请求的是前端路由，返回API信息
+// 兜底：非 /api 的所有未知路径重定向到根路径
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) {
         res.status(404).json({
@@ -1309,11 +1299,7 @@ app.get('*', (req, res) => {
             ]
         });
     } else {
-        res.json({
-            message: 'NutriScan Backend Dashboard',
-            note: 'Frontend not built yet. Use API endpoints directly.',
-            api_base: '/api'
-        });
+        res.redirect('/');
     }
 });
 

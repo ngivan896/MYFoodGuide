@@ -1,6 +1,7 @@
 // 真实数据服务
 const apiConfig = require('../config/api-config');
 const axios = require('axios');
+// 移除未使用的引用，避免潜在循环依赖和linter告警
 
 class RealDataService {
     constructor() {
@@ -59,6 +60,8 @@ class RealDataService {
                         progress: session.progress || 100,
                         startTime: session.created_at,
                         endTime: session.completed_at,
+                        // 前端显示创建时间使用 created_at 字段
+                        created_at: session.created_at,
                         config: session.model_config || {
                             epochs: 100,
                             batch_size: 16,
@@ -94,16 +97,72 @@ class RealDataService {
         if (cached) return cached;
 
         try {
-            // 尝试从Roboflow获取数据
+            // 仅读取 Roboflow 数据集（只读）
             const roboflowConfig = apiConfig.getConfig('roboflow');
             if (roboflowConfig.apiKey && roboflowConfig.projectId) {
                 console.log('🔗 正在从Roboflow获取数据集数据...');
                 const client = apiConfig.createAPIClient('roboflow');
-                const response = await client.get('/');
-                const data = this.transformRoboflowData(response.data);
-                this.setCachedData(cacheKey, data);
-                console.log('✅ Roboflow数据获取成功');
-                return data;
+                try {
+                    // 获取项目信息和统计
+                    const workspace = roboflowConfig.workspace || roboflowConfig.ws || roboflowConfig.org || '';
+                    const apiKeyQ = roboflowConfig.apiKey ? `?api_key=${encodeURIComponent(roboflowConfig.apiKey)}` : '';
+                    const projectPath = workspace ? `/${workspace}/${roboflowConfig.projectId}${apiKeyQ}` : `/${roboflowConfig.projectId}${apiKeyQ}`;
+                    const statsPath = workspace ? `/${workspace}/${roboflowConfig.projectId}/stats${apiKeyQ}` : `/${roboflowConfig.projectId}/stats${apiKeyQ}`;
+                    const projectResp = await client.get(projectPath);
+                    const statsResp = await client.get(statsPath).catch(() => ({ data: {} }));
+                    // 额外尝试：读取版本列表中的样本/图片数量
+                    let versionsCount = undefined;
+                    try {
+                        const versionsPath = workspace ? `/${workspace}/${roboflowConfig.projectId}/versions${apiKeyQ}` : `/${roboflowConfig.projectId}/versions${apiKeyQ}`;
+                        const versionsResp = await client.get(versionsPath);
+                        const versions = versionsResp.data?.versions || [];
+                        const latest = versions[0] || null;
+                        if (latest) {
+                            const vcands = [latest.images, latest.samples, latest.sample_count, latest.num_images];
+                            const vn = vcands.find(v => typeof v === 'number' && !Number.isNaN(v));
+                            if (typeof vn === 'number') versionsCount = vn;
+                        }
+                    } catch (_) {}
+                    const roboflowData = { workspace: roboflowConfig.workspace };
+                    const data = await this.transformRoboflowData({ ...roboflowData, projectResp: projectResp.data, statsResp: statsResp.data, versionsCount });
+                    // 用最新的名称与统计覆盖（transform 内部也会做一次兜底）
+                    if (data && data.datasets && data.datasets[0]) {
+                        const ds = data.datasets[0];
+                        const prjRoot = projectResp.data || {};
+                        const prj = prjRoot.project || prjRoot; // 兼容 { project: {...} } 或直接平铺
+                        ds.name = prj.name || ds.name;
+                        ds.description = prj.description || ds.description;
+                        const stRoot = statsResp.data || {};
+                        const st = stRoot.project || stRoot; // 兼容 { project: {...} }
+                        const candidates = [
+                            st.images,
+                            prj.images,
+                            prj.num_images,
+                            prj.image_count,
+                            prj.images_count,
+                            prj.samples,
+                            prj.sample_count,
+                            prj.numImages,
+                            versionsCount
+                        ];
+                        const firstNumber = candidates.find(v => typeof v === 'number' && !Number.isNaN(v));
+                        if (typeof firstNumber === 'number') {
+                            ds.file_count = firstNumber;
+                        }
+                        // 覆盖 splits：优先 stats，其次 project.splits
+                        const prjSplits = prj.splits || {};
+                        ds.splits = {
+                            train: typeof st.train === 'number' ? st.train : (typeof prjSplits.train === 'number' ? prjSplits.train : 0),
+                            valid: typeof st.valid === 'number' ? st.valid : (typeof prjSplits.valid === 'number' ? prjSplits.valid : 0),
+                            test: typeof st.test === 'number' ? st.test : (typeof prjSplits.test === 'number' ? prjSplits.test : 0),
+                        };
+                    }
+                    this.setCachedData(cacheKey, data);
+                    console.log('✅ Roboflow数据获取成功');
+                    return data;
+                } catch (e) {
+                    console.error('从Roboflow获取数据失败:', e);
+                }
             }
 
             // 尝试从自定义数据集API获取
@@ -116,10 +175,13 @@ class RealDataService {
                 return data;
             }
 
-            return this.getMockDatasets();
+            // 默认返回空（不再返回模拟数据）
+            const empty = { datasets: [] };
+            this.setCachedData(cacheKey, empty);
+            return empty;
         } catch (error) {
             console.error('Error fetching datasets:', error);
-            return this.getMockDatasets();
+            return { datasets: [] };
         }
     }
 
@@ -130,6 +192,58 @@ class RealDataService {
         if (cached) return cached;
 
         try {
+            // 1) 优先使用本地真实训练会话作为模型来源
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const sessionsFile = path.join(__dirname, '..', 'data', 'training_sessions.json');
+                if (fs.existsSync(sessionsFile)) {
+                    const sessionsContent = fs.readFileSync(sessionsFile, 'utf8');
+                    const sessions = JSON.parse(sessionsContent);
+                    const sessionArray = Object.values(sessions);
+
+                    const modelsFromSessions = sessionArray.map((s, idx) => {
+                        // 取主要指标（mAP50 或 mAP50-95)
+                        const mAP50 = s.metrics?.['metrics/mAP50(B)'];
+                        const mAP5095 = s.metrics?.['metrics/mAP50-95(B)'];
+                        // 计算best文件大小（MB）
+                        let fileSize = 0;
+                        try {
+                            if (s.best_model_path) {
+                                const bestAbs = path.isAbsolute(s.best_model_path)
+                                    ? s.best_model_path
+                                    : path.join(__dirname, '..', s.best_model_path);
+                                if (fs.existsSync(bestAbs)) {
+                                    fileSize = +(fs.statSync(bestAbs).size / 1024 / 1024).toFixed(1);
+                                }
+                            }
+                        } catch (_) {}
+
+                        return {
+                            id: s.id || `model_${idx + 1}`,
+                            name: `YOLO ${s.model_config?.model_type || 'model'}`,
+                            version: s.created_at || new Date().toISOString(),
+                            accuracy: typeof mAP50 === 'number' ? mAP50 : (typeof mAP5095 === 'number' ? mAP5095 : undefined),
+                            status: 'active',
+                            file_size: fileSize || undefined,
+                            created_at: s.created_at,
+                            inference_time: undefined,
+                            classes: Array.isArray(s.model_config?.names) ? s.model_config.names.length : undefined,
+                            source: 'local',
+                            best_model_path: s.best_model_path,
+                            exported_models: s.exported_models || {}
+                        };
+                    });
+
+                    if (modelsFromSessions.length > 0) {
+                        this.setCachedData(cacheKey, modelsFromSessions);
+                        return modelsFromSessions;
+                    }
+                }
+            } catch (localErr) {
+                console.error('读取本地训练会话生成模型失败:', localErr);
+            }
+
             // 尝试从自定义模型API获取数据
             const customConfig = apiConfig.getConfig('custom');
             if (customConfig.modelAPI?.baseUrl) {
@@ -148,7 +262,10 @@ class RealDataService {
                 
                 try {
                     // 获取项目版本信息（模型版本）
-                    const versionsResponse = await client.get(`/${roboflowConfig.projectId}/versions`);
+                    const workspace = roboflowConfig.workspace || roboflowConfig.ws || roboflowConfig.org || '';
+                    const apiKeyQ = roboflowConfig.apiKey ? `?api_key=${encodeURIComponent(roboflowConfig.apiKey)}` : '';
+                    const versionsPath = workspace ? `/${workspace}/${roboflowConfig.projectId}/versions${apiKeyQ}` : `/${roboflowConfig.projectId}/versions${apiKeyQ}`;
+                    const versionsResponse = await client.get(versionsPath);
                     const versionsData = versionsResponse.data;
                     
                     const models = versionsData.versions?.map((version, index) => ({
@@ -286,12 +403,20 @@ class RealDataService {
             const client = apiConfig.createAPIClient('roboflow');
             
             // 获取项目详细信息
-            const projectResponse = await client.get(`/${roboflowConfig.projectId}`);
-            const projectData = projectResponse.data;
+            const workspace = roboflowConfig.workspace || roboflowConfig.ws || roboflowConfig.org || '';
+            const apiKeyQ = roboflowConfig.apiKey ? `?api_key=${encodeURIComponent(roboflowConfig.apiKey)}` : '';
+            const projectPath = workspace ? `/${workspace}/${roboflowConfig.projectId}${apiKeyQ}` : `/${roboflowConfig.projectId}${apiKeyQ}`;
+            const projectResponse = roboflowData.projectResp ? { data: roboflowData.projectResp } : await client.get(projectPath);
+            const projectData = (projectResponse.data && projectResponse.data.project) ? projectResponse.data.project : projectResponse.data;
             
             // 获取数据集统计信息
-            const statsResponse = await client.get(`/${roboflowConfig.projectId}/stats`);
-            const statsData = statsResponse.data;
+            const statsPath = workspace ? `/${workspace}/${roboflowConfig.projectId}/stats${apiKeyQ}` : `/${roboflowConfig.projectId}/stats${apiKeyQ}`;
+            const statsResponse = roboflowData.statsResp ? { data: roboflowData.statsResp } : await client.get(statsPath).catch(() => ({ data: {} }));
+            const statsDataRaw = statsResponse.data || {};
+            const statsData = statsDataRaw.project || statsDataRaw;
+
+            // 版本图片数兜底
+            const versionsCount = typeof roboflowData.versionsCount === 'number' ? roboflowData.versionsCount : undefined;
             
             const datasets = [{
                 id: 'roboflow_main',
@@ -301,37 +426,26 @@ class RealDataService {
                 source: 'roboflow',
                 status: 'ready',
                 created_at: projectData.created || new Date().toISOString(),
-                file_count: statsData.images || 1000,
-                total_size: this.formatBytes(statsData.size || 0),
+                file_count: typeof statsData.images === 'number' ? statsData.images : (
+                    typeof projectData.images === 'number' ? projectData.images : (typeof versionsCount === 'number' ? versionsCount : 0)
+                ),
+                total_size: this.formatBytes(typeof statsData.size === 'number' ? statsData.size : 0),
                 workspace: roboflowData.workspace,
                 api_status: 'connected',
-                classes: statsData.classes || 20,
-                annotations: statsData.annotations || 0,
+                classes: typeof statsData.classes === 'number' ? statsData.classes : undefined,
+                annotations: typeof statsData.annotations === 'number' ? statsData.annotations : 0,
                 splits: {
-                    train: statsData.train || 0,
-                    valid: statsData.valid || 0,
-                    test: statsData.test || 0
+                    train: typeof statsData.train === 'number' ? statsData.train : (projectData.splits?.train ?? 0),
+                    valid: typeof statsData.valid === 'number' ? statsData.valid : (projectData.splits?.valid ?? 0),
+                    test: typeof statsData.test === 'number' ? statsData.test : (projectData.splits?.test ?? 0)
                 }
             }];
             
             return { datasets };
         } catch (error) {
             console.error('获取详细Roboflow数据失败:', error);
-            // 回退到基础数据
-            const datasets = [{
-                id: 'roboflow_main',
-                name: 'Malaysian Food Detection Dataset',
-                description: `Roboflow项目: ${roboflowData.workspace || 'malaysian-food-detection'}`,
-                type: 'yolo',
-                source: 'roboflow',
-                status: 'ready',
-                created_at: new Date().toISOString(),
-                file_count: 1000,
-                total_size: '2.5GB',
-                workspace: roboflowData.workspace,
-                api_status: 'connected'
-            }];
-            return { datasets };
+            // 严格回退为空，避免任何伪数据
+            return { datasets: [] };
         }
     }
 

@@ -84,6 +84,7 @@
 ### 📊 当前仪表盘状态
 - **活跃训练会话**: 0 (真实)
 - **数据集总数**: 1 (基于Roboflow API) ✅
+- **Roboflow 图片数映射**: 已正确读取 `images: 57`、`splits: {train:40, valid:11, test:6}` ✅
 - **模型版本**: 0 (基于Roboflow API)
 - **API调用次数**: 170+ (基于真实系统统计) ✅
 - **数据集分布图**: 显示"Malaysian Food Detection Dataset" ✅
@@ -274,7 +275,11 @@ Roboflow API → Express → RealDataService → HTML/JS
 ```
 
 ### 🔄 真实数据源集成
-- **Roboflow API**: 数据集和模型版本信息
+- **Roboflow API**: 数据集和模型版本信息（启用 workspace/project 路径与私钥 `?api_key=`）
+- 映射规则：
+  - `datasets[0].file_count` ← `project.images` → 若无则 `versions[0].images` → 若无则 `stats.images`
+  - `datasets[0].splits` ← `stats.train/valid/test` → 若无则 `project.splits.train/valid/test`
+  - `datasets[0].name/description` ← `project.name/description`
 - **系统监控**: CPU、内存、API调用统计
 - **本地文件**: 训练会话和配置数据
 - **无模拟数据**: 完全基于真实数据源

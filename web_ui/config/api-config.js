@@ -6,9 +6,10 @@ class APIConfig {
         this.config = {
             // Roboflow API配置
             roboflow: {
-                apiKey: process.env.ROBOFLOW_API_KEY || 'BwTemPbP39LHLFH4teds',
-                projectId: process.env.ROBOFLOW_PROJECT_ID || 'projects/326667818607',
-                baseUrl: 'https://api.roboflow.com'
+                apiKey: 'BwTemPbP39LHLFH4teds', // 必须是你 Roboflow 后台生成的 workspace 私钥
+                workspace: 'malaysian-food-detection',
+                projectId: 'malaysian-food-detection-wy3kt',
+                baseUrl: 'https://api.roboflow.com',
             },
             
             // Gemini API配置
@@ -64,12 +65,13 @@ class APIConfig {
         if (!config.baseUrl) {
             throw new Error(`No base URL configured for ${service}`);
         }
-
+        // Roboflow 不加 Authorization，只保留 Content-Type，customHeaders 留给自定义API
+        const isRoboflow = service === 'roboflow';
         return axios.create({
             baseURL: config.baseUrl,
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': config.apiKey ? `Bearer ${config.apiKey}` : undefined,
+                ...(isRoboflow ? {} : {'Authorization': config.apiKey ? `Bearer ${config.apiKey}` : undefined}),
                 ...customHeaders
             },
             timeout: 30000

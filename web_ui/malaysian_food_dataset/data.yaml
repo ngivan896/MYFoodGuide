@@ -1,6 +1,0 @@
-path: ./malaysian_food_dataset
-train: train/images
-val: valid/images
-test: test/images
-nc: 8
-names: ['nasi_lemak', 'roti_canai', 'char_kway_teow', 'hokkien_mee', 'bak_kut_teh', 'curry_laksa', 'satay', 'wantan_mee']

@@ -669,45 +669,59 @@
         <!-- 模型训练 -->
         <div id="training" class="content">
             <div class="card fade-in">
-                <h3>🚀 Google Colab 智能集成</h3>
-                <p style="color: #a6a6a6; margin-bottom: 20px;">通过Google Colab进行云端模型训练</p>
-                
+                <h3>🤖 推荐使用本地一键训练脚本</h3>
+                <p style="color: #52c41a; font-weight: bold; margin-bottom: 16px;">更快 · 更多格式 · 更省心</p>
+                <div style="background: #1a1a1a; border-left: 4px solid #52c41a; padding: 20px; border-radius: 10px; margin-bottom: 18px;">
+                    <div style="font-size: 16px; font-weight: bold; color: #1890ff; margin-bottom: 10px;">🚀 极简流程：</div>
+                    <div style="color: #a6a6a6; font-size: 14px;">
+                        <ol style="margin: 0 0 0 18px;">
+                            <li>安装依赖：<span style="font-family:monospace">pip install ultralytics roboflow torch torchvision</span></li>
+                            <li>进入本项目 <span style="font-family:monospace">cd web_ui</span></li>
+                            <li>一键训练：<span style="font-family:monospace">python local_training.py</span></li>
+                            <li>所有结果自动输出到 <span style="font-family:monospace">nutriscan_training/</span></li>
+                        </ol>
+                        <div style="margin-top:10px">详细教程可见 <b>LOCAL_TRAINING_GUIDE.md</b></div>
+                        <div style="margin-top:10px; color:#faad14;">原Colab按钮仅供迁移或参考，推荐本地生产训练！</div>
+                    </div>
+                </div>
+                <hr style="margin: 18px 0 8px 0; border: 0; border-top: 1px solid #303030;">
                 <div class="grid-2">
                     <div>
-                        <h4>训练模板</h4>
-                        <div style="margin: 16px 0;">
-                            <div class="api-endpoint">
-                                <span class="api-method method-get">GET</span>
-                                <span>/api/training/colab/templates</span>
-                            </div>
-                            <button class="btn btn-small" onclick="downloadTemplate('yolov8_basic')" style="margin-top: 8px;">📥 下载基础模板</button>
-                            <button class="btn btn-small" onclick="downloadTemplate('yolov8_advanced')" style="margin-top: 8px;">📥 下载高级模板</button>
-                        </div>
-                        
-                        <h4>启动训练</h4>
-                        <div style="margin: 16px 0;">
-                            <div class="api-endpoint">
-                                <span class="api-method method-post">POST</span>
-                                <span>/api/training/colab/launch</span>
-                            </div>
-                            <button class="btn btn-primary" onclick="launchTraining()" style="margin-top: 8px;">🚀 启动训练</button>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h4>训练配置</h4>
+                        <h4 style="color:#a6a6a6;">训练参数配置（只读）</h4>
                         <div style="background: #262626; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 12px;">
                             {<br>
+                            &nbsp;&nbsp;"dataset": "马来西亚食物数据集",<br>
+                            &nbsp;&nbsp;"classes": 8,<br>
                             &nbsp;&nbsp;"model_type": "yolov8n",<br>
                             &nbsp;&nbsp;"epochs": 100,<br>
                             &nbsp;&nbsp;"batch_size": 16,<br>
-                            &nbsp;&nbsp;"learning_rate": 0.01<br>
+                            &nbsp;&nbsp;"learning_rate": 0.01,<br>
+                            &nbsp;&nbsp;"img_size": 640<br>
                             }
                         </div>
                     </div>
+                    <div>
+                        <h4 style="color:#a6a6a6;">常见问题 & 提示</h4>
+                        <ul style="color:#a6a6a6; font-size:14px; padding-left:20px;">
+                            <li>训练更快：本地训练速度优于Colab</li>
+                            <li>自动导出多部署格式</li>
+                            <li>数据隐私更有保障</li>
+                            <li>支持恢复和断点续训</li>
+                        </ul>
+                        <div style="margin-top:10px;">如需查看训练历史和数据统计，请见下方内容。</div>
+                    </div>
                 </div>
-                
-                <button class="btn" onclick="testAPI('/api/training/colab/templates')">测试API</button>
+            </div>
+            <!-- 保留历史训练结果/训练会话展示 -->
+            <div class="card fade-in">
+                <h3>📜 历史训练会话</h3>
+                <div id="training-sessions" class="sessions-list">
+                    <div style="text-align: center; padding: 40px; color: #a6a6a6;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+                        <div style="font-size: 16px; margin-bottom: 8px;">暂无训练会话</div>
+                        <div style="font-size: 14px;">请先运行本地 <b>local_training.py</b> 启动你的第一个训练</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -718,17 +732,17 @@
                 <div class="grid-3">
                     <div class="stat-card">
                         <div class="stat-icon">📊</div>
-                        <div class="stat-value">8</div>
+                        <div class="stat-value" id="models-total">0</div>
                         <div class="stat-label">总模型数</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">✅</div>
-                        <div class="stat-value">5</div>
+                        <div class="stat-value" id="models-active">0</div>
                         <div class="stat-label">活跃模型</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">📈</div>
-                        <div class="stat-value">89%</div>
+                        <div class="stat-value" id="models-avg-acc">0%</div>
                         <div class="stat-label">平均准确率</div>
                     </div>
                 </div>
@@ -754,17 +768,17 @@
                 <div class="grid-3">
                     <div class="stat-card">
                         <div class="stat-icon">📊</div>
-                        <div class="stat-value">5</div>
+                        <div class="stat-value" id="datasets-total">0</div>
                         <div class="stat-label">总数据集数</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">📈</div>
-                        <div class="stat-value">2,500</div>
+                        <div class="stat-value" id="datasets-files">0</div>
                         <div class="stat-label">总文件数</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">✅</div>
-                        <div class="stat-value">3</div>
+                        <div class="stat-value" id="datasets-ready">0</div>
                         <div class="stat-label">就绪数据集</div>
                     </div>
                 </div>
@@ -1124,7 +1138,7 @@
             showNotification('📥 正在下载训练模板...', 'info');
         }
 
-        // 加载真实数据
+            // 加载真实数据
         async function loadRealData() {
             try {
                 // 加载系统统计
@@ -1139,8 +1153,17 @@
                 const datasetsResponse = await fetch('/api/datasets');
                 const datasetsData = await datasetsResponse.json();
                 
+                // 加载模型
+                let modelsData = { models: [] };
+                try {
+                    const modelsResponse = await fetch('/api/models/versions');
+                    const rawModels = await modelsResponse.json();
+                    modelsData.models = rawModels.models || rawModels || [];
+                } catch (e) { console.warn('加载模型数据失败', e); }
+
                 // 更新页面数据
                 updateDashboardData(statsData.stats, sessionsData.sessions || [], datasetsData.datasets || []);
+                updateModelsStats(modelsData.models || []);
                 
                 // 更新最后更新时间
                 const lastUpdateElement = document.getElementById('last-update-time');
@@ -1158,6 +1181,23 @@
                     lastUpdateElement.textContent = '加载失败';
                 }
             }
+        }
+
+        // 更新模型页统计
+        function updateModelsStats(models) {
+            const total = Array.isArray(models) ? models.length : 0;
+            const active = Array.isArray(models) ? models.filter(m => m.status === 'active').length : 0;
+            let avg = 0;
+            if (Array.isArray(models) && models.length) {
+                const accs = models.map(m => typeof m.accuracy === 'number' ? m.accuracy : 0).filter(v => !isNaN(v));
+                if (accs.length) avg = accs.reduce((a,b)=>a+b,0) / accs.length;
+            }
+            const totalEl = document.getElementById('models-total');
+            const activeEl = document.getElementById('models-active');
+            const avgEl = document.getElementById('models-avg-acc');
+            if (totalEl) totalEl.textContent = total;
+            if (activeEl) activeEl.textContent = active;
+            if (avgEl) avgEl.textContent = (avg*100).toFixed(0) + '%';
         }
 
         // 更新仪表盘数据
@@ -1196,6 +1236,8 @@
         function updateTrainingSessions(sessions) {
             const sessionsContainer = document.querySelector('.sessions-list');
             if (!sessionsContainer) return;
+            // 保存到全局，供详情按钮使用
+            window.__NS_SESSIONS__ = sessions;
             
             if (sessions.length === 0) {
                 sessionsContainer.innerHTML = `
@@ -1209,17 +1251,70 @@
             }
             
             sessionsContainer.innerHTML = sessions.map(session => `
-                <div class="session-item" data-session-id="${session.id}">
-                    <div class="session-header">
-                        <h4>${session.name}</h4>
-                        <span class="status-${session.status}">${session.status}</span>
+                <div class="session-item" data-session-id="${session.id}" style="border:1px solid #303030;border-radius:10px;padding:14px;margin-bottom:12px;background:#1a1a1a;">
+                    <div class="session-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                        <div>
+                            <h4 style="margin:0 0 6px 0;">${session.name}</h4>
+                            <div style="font-size:12px;color:#a6a6a6;">创建时间: ${new Date(session.created_at || session.startTime || Date.now()).toLocaleString('zh-CN')}</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span class="status-${session.status}">${session.status}</span>
+                            <button class="btn-small" onclick="toggleSessionDetails('${session.id}')">查看详情</button>
+                        </div>
                     </div>
-                    <div class="session-details">
-                        <p>进度: ${session.progress || 0}%</p>
-                        <p>创建时间: ${new Date(session.created_at).toLocaleString('zh-CN')}</p>
+                    <div class="session-details" style="margin-top:10px;color:#a6a6a6;">
+                        <div>进度: ${session.progress || 0}%</div>
+                    </div>
+                    <div id="detail-${session.id}" style="display:none;margin-top:12px;background:#262626;border:1px solid #404040;border-radius:8px;padding:12px;">
+                        ${renderSessionDetailHTML(session)}
                     </div>
                 </div>
             `).join('');
+        }
+
+        // 渲染会话详情区域
+        function renderSessionDetailHTML(session){
+            const cfg = session.config || session.model_config || {};
+            const metrics = session.metrics || {};
+            const foods = Array.isArray(cfg.names) ? cfg.names
+                : (Array.isArray(session?.dataset_stats?.class_names) ? session.dataset_stats.class_names
+                : (Array.isArray(session?.dataset_stats?.names) ? session.dataset_stats.names : []));
+            const exported = session.exported_models || {};
+            const best = session.best_model_path || '';
+            return `
+                <div class="grid-2" style="gap:12px;">
+                    <div>
+                        <h4 style="color:#fff;margin:0 0 8px 0;">训练食物类别</h4>
+                        ${foods.length ? `
+                        <div style=\"display:flex;flex-wrap:wrap;gap:8px;\">
+                            ${foods.map(f=>`<span style='padding:4px 8px;border:1px solid #404040;border-radius:14px;color:#a6a6a6;'>${f}</span>`).join('')}
+                        </div>` : `<div style=\"color:#a6a6a6;\">未找到类别清单（等待训练脚本写入names）</div>`}
+                        <div class="metrics">
+                            <h5>📊 指标</h5>
+                            <p>mAP50: ${metrics['metrics/mAP50(B)'] ?? '-'}</p>
+                            <p>mAP50-95: ${metrics['metrics/mAP50-95(B)'] ?? '-'}</p>
+                            <p>Precision: ${metrics['metrics/precision(B)'] ?? '-'}</p>
+                            <p>Recall: ${metrics['metrics/recall(B)'] ?? '-'}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="color:#fff;margin:0 0 8px 0;">训练配置</h4>
+                        <div class="code-block" style="max-height:220px;overflow:auto;"><code>${escapeHtml(JSON.stringify(cfg, null, 2))}</code></div>
+                        ${best ? `<div style='margin-top:8px;'>最佳权重: <a href='/${best}' target='_blank' style='color:#1890ff;'>${best}</a></div>` : ''}
+                        ${Object.keys(exported).length? `<div style='margin-top:6px;'>导出: ${Object.entries(exported).map(([k,v])=>`<a href='/${v}' target='_blank' style='color:#1890ff;margin-right:8px;'>${k}</a>`).join('')}</div>`:''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleSessionDetails(id){
+            const el = document.getElementById(`detail-${id}`);
+            if (!el) return;
+            el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+        }
+
+        function escapeHtml(str){
+            return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
         }
 
         // 更新数据集信息
@@ -1247,7 +1342,7 @@
             `).join('');
         }
 
-        // 使用真实数据初始化图表
+            // 使用真实数据初始化图表
         function initChartsWithRealData(stats, sessions, datasets) {
             console.log('🔍 初始化图表，数据:', { stats, sessions, datasets });
             
@@ -1344,6 +1439,16 @@
             });
             }
             }
+
+            // 数据集页统计（真实）
+            try {
+                const dsTotalEl = document.getElementById('datasets-total');
+                const dsFilesEl = document.getElementById('datasets-files');
+                const dsReadyEl = document.getElementById('datasets-ready');
+                if (dsTotalEl) dsTotalEl.textContent = Array.isArray(datasets) ? datasets.length : 0;
+                if (dsFilesEl) dsFilesEl.textContent = Array.isArray(datasets) ? datasets.reduce((s,d)=>s + (d.file_count||0), 0) : 0;
+                if (dsReadyEl) dsReadyEl.textContent = Array.isArray(datasets) ? datasets.filter(d=>d.status==='ready').length : 0;
+            } catch(e) { console.warn('更新数据集统计失败', e); }
 
             // 数据集分布图 - 使用真实数据
             console.log('🔍 数据集分布图调试:', datasets);
