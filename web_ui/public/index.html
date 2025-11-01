@@ -592,6 +592,61 @@
                 margin: 4px;
             }
         }
+
+        /* 浅色主题 */
+        body.light-theme {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8edf5 100%);
+            color: #1a1a1a;
+        }
+
+        body.light-theme .header {
+            border-bottom-color: #d9d9d9;
+        }
+
+        body.light-theme .header p {
+            color: #595959;
+        }
+
+        body.light-theme .card {
+            background: linear-gradient(145deg, #ffffff 0%, #f5f7fa 100%);
+            border-color: #d9d9d9;
+            color: #1a1a1a;
+        }
+
+        body.light-theme .stat-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f5f7fa 100%);
+            border-color: #d9d9d9;
+        }
+
+        body.light-theme .nav-tabs {
+            background: #ffffff;
+            border-color: #d9d9d9;
+        }
+
+        body.light-theme .nav-tab {
+            color: #595959;
+        }
+
+        body.light-theme .nav-tab:hover {
+            background: #f0f0f0;
+            color: #1a1a1a;
+        }
+
+        body.light-theme .stat-label {
+            color: #595959;
+        }
+
+        body.light-theme select,
+        body.light-theme input {
+            background: #ffffff;
+            color: #1a1a1a;
+            border-color: #d9d9d9;
+        }
+
+        body.light-theme .api-endpoint {
+            background: #f5f7fa;
+            border-color: #d9d9d9;
+        }
     </style>
 </head>
 <body>
@@ -607,6 +662,7 @@
 
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="showTab('dashboard')">📊 仪表盘</button>
+            <button class="nav-tab" onclick="showTab('detection')">🍽️ 食物识别</button>
             <button class="nav-tab" onclick="showTab('training')">🤖 模型训练</button>
             <button class="nav-tab" onclick="showTab('models')">☁️ 模型管理</button>
             <button class="nav-tab" onclick="showTab('datasets')">📁 数据集</button>
@@ -656,7 +712,7 @@
 
             <div class="card fade-in">
                 <h3>🚀 训练会话</h3>
-                <div id="training-sessions">
+                <div id="dashboard-training-sessions" class="sessions-list">
                     <div style="text-align: center; padding: 40px; color: #a6a6a6;">
                         <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
                         <div style="font-size: 16px; margin-bottom: 8px;">暂无训练会话</div>
@@ -715,7 +771,7 @@
             <!-- 保留历史训练结果/训练会话展示 -->
             <div class="card fade-in">
                 <h3>📜 历史训练会话</h3>
-                <div id="training-sessions" class="sessions-list">
+                <div id="training-training-sessions" class="sessions-list">
                     <div style="text-align: center; padding: 40px; color: #a6a6a6;">
                         <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
                         <div style="font-size: 16px; margin-bottom: 8px;">暂无训练会话</div>
@@ -805,22 +861,28 @@
         <div id="api" class="content">
             <div class="card fade-in">
                 <h3>🔧 API服务管理</h3>
-                <div class="grid-2">
-                    <div>
-                        <h4>系统状态</h4>
-                        <div class="stat-card">
-                            <div class="stat-icon">💚</div>
-                            <div class="stat-value">99.9%</div>
-                            <div class="stat-label">服务可用性</div>
-                        </div>
+                <div class="stats-grid" id="api-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">💚</div>
+                        <div class="stat-value" id="api-availability">加载中...</div>
+                        <div class="stat-label">服务可用性</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">基于健康检查和错误率</div>
                     </div>
-                    <div>
-                        <h4>性能指标</h4>
-                        <div class="stat-card">
-                            <div class="stat-icon">⚡</div>
-                            <div class="stat-value">156ms</div>
-                            <div class="stat-label">平均响应时间</div>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-value" id="api-response-time">加载中...</div>
+                        <div class="stat-label">健康检查响应时间</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">实时测量GET /api/monitor/health</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="api-total-calls">加载中...</div>
+                        <div class="stat-label">API总调用次数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-value" id="api-errors">加载中...</div>
+                        <div class="stat-label">错误次数</div>
                     </div>
                 </div>
                 
@@ -828,15 +890,74 @@
                 <div class="api-endpoint">
                     <span class="api-method method-get">GET</span>
                     <span>/api/monitor/health</span>
+                    <span style="color: #52c41a; margin-left: 12px;">用于测量响应时间</span>
                 </div>
                 <div class="api-endpoint">
                     <span class="api-method method-get">GET</span>
                     <span>/api/monitor/stats</span>
+                    <span style="color: #1890ff; margin-left: 12px;">获取系统统计数据</span>
+                </div>
+                
+                <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                    <h4 style="color: #fff; margin: 0 0 12px 0; font-size: 14px;">📋 响应时间计算说明</h4>
+                    <p style="color: #999; font-size: 12px; line-height: 1.6; margin: 0;">
+                        使用浏览器的 <code style="background: #262626; padding: 2px 6px; border-radius: 4px;">performance.now()</code> API 
+                        测量从发起请求到收到响应的时间差。本地服务器通常响应时间为 <strong style="color: #52c41a;">1-10ms</strong>。
+                    </p>
                 </div>
                 
                 <button class="btn" onclick="testAPI('/api/monitor/health')">健康检查</button>
                 <button class="btn" onclick="testAPI('/api/monitor/stats')">系统统计</button>
+                <button class="btn" onclick="loadAPIMonitorData()">🔄 刷新数据</button>
                 <button class="btn" onclick="window.open('/api-config.html', '_blank')">API配置</button>
+            </div>
+        </div>
+
+        <!-- 食物识别 -->
+        <div id="detection" class="content">
+            <div class="card fade-in">
+                <h3>🍽️ 食物识别分析</h3>
+                <p style="color: #a6a6a6; margin-bottom: 24px;">上传食物照片，使用训练好的模型进行识别分析</p>
+                
+                <!-- 上传区域 -->
+                <div id="upload-area" style="border: 2px dashed #404040; border-radius: 12px; padding: 40px; text-align: center; background: #1a1a1a; cursor: pointer; transition: all 0.3s;" 
+                     onmouseover="this.style.borderColor='#1890ff'; this.style.background='#1f1f2e';" 
+                     onmouseout="this.style.borderColor='#404040'; this.style.background='#1a1a1a';"
+                     onclick="document.getElementById('image-input').click()">
+                    <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                    <div style="font-size: 48px; margin-bottom: 16px;">📷</div>
+                    <h4 style="color: #ffffff; margin-bottom: 8px;">点击或拖拽上传图片</h4>
+                    <p style="color: #a6a6a6; font-size: 14px;">支持 JPG、PNG 格式，最大 10MB</p>
+                </div>
+
+                <!-- 预览和结果区域 -->
+                <div id="detection-results" style="display: none; margin-top: 24px;">
+                    <div class="grid-2" style="gap: 24px;">
+                        <!-- 图片预览 -->
+                        <div>
+                            <h4 style="color: #ffffff; margin-bottom: 16px;">上传的图片</h4>
+                            <div style="border: 1px solid #303030; border-radius: 12px; padding: 16px; background: #1a1a1a;">
+                                <img id="preview-image" src="" alt="预览图片" style="max-width: 100%; border-radius: 8px; display: block;">
+                                <canvas id="result-canvas" style="display: none; max-width: 100%; border-radius: 8px;"></canvas>
+                            </div>
+                            <button class="btn-primary" onclick="document.getElementById('image-input').click()" style="width: 100%; margin-top: 12px;">重新上传</button>
+                        </div>
+
+                        <!-- 识别结果 -->
+                        <div>
+                            <h4 style="color: #ffffff; margin-bottom: 16px;">识别结果</h4>
+                            <div id="detection-info" style="background: #1a1a1a; border: 1px solid #303030; border-radius: 12px; padding: 20px;">
+                                <div id="detection-loading" style="text-align: center; padding: 40px;">
+                                    <div style="font-size: 32px; margin-bottom: 16px;">⏳</div>
+                                    <p style="color: #a6a6a6;">正在分析图片...</p>
+                                </div>
+                                <div id="detection-content" style="display: none;">
+                                    <!-- 结果将在这里显示 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -850,16 +971,16 @@
                         <div style="background: #262626; padding: 16px; border-radius: 8px;">
                             <div style="margin-bottom: 12px;">
                                 <label style="color: #a6a6a6;">主题模式:</label>
-                                <select style="background: #1a1a1a; color: #ffffff; border: 1px solid #404040; padding: 8px; border-radius: 4px; margin-left: 8px;">
-                                    <option>深色主题</option>
-                                    <option>浅色主题</option>
+                                <select id="theme-selector" style="background: #1a1a1a; color: #ffffff; border: 1px solid #404040; padding: 8px; border-radius: 4px; margin-left: 8px; cursor: pointer;">
+                                    <option value="dark">深色主题</option>
+                                    <option value="light">浅色主题</option>
                                 </select>
                             </div>
                             <div style="margin-bottom: 12px;">
                                 <label style="color: #a6a6a6;">语言:</label>
-                                <select style="background: #1a1a1a; color: #ffffff; border: 1px solid #404040; padding: 8px; border-radius: 4px; margin-left: 8px;">
-                                    <option>中文简体</option>
-                                    <option>English</option>
+                                <select id="language-selector" style="background: #1a1a1a; color: #ffffff; border: 1px solid #404040; padding: 8px; border-radius: 4px; margin-left: 8px; cursor: pointer;">
+                                    <option value="zh-CN">中文简体</option>
+                                    <option value="en">English</option>
                                 </select>
                             </div>
                         </div>
@@ -867,25 +988,162 @@
                     
                     <div>
                         <h4>API配置</h4>
-                        <div style="background: #262626; padding: 16px; border-radius: 8px;">
-                            <div style="margin-bottom: 12px;">
-                                <label style="color: #a6a6a6;">Gemini API Key:</label>
-                                <input type="password" placeholder="输入API密钥" style="background: #1a1a1a; color: #ffffff; border: 1px solid #404040; padding: 8px; border-radius: 4px; width: 100%; margin-top: 4px;">
-                            </div>
-                            <div>
-                                <label style="color: #a6a6a6;">Roboflow API Key:</label>
-                                <input type="password" placeholder="输入API密钥" style="background: #1a1a1a; color: #ffffff; border: 1px solid #404040; padding: 8px; border-radius: 4px; width: 100%; margin-top: 4px;">
-                            </div>
+                        <div style="background: #262626; padding: 16px; border-radius: 8px; text-align: center;">
+                            <p style="color: #a6a6a6; margin-bottom: 16px;">API密钥配置和监控已移至专门的API管理页面</p>
+                            <button class="btn" onclick="showTab('api')" style="width: auto; margin: 0;">
+                                🔧 前往API管理页面
+                            </button>
+                            <p style="color: #666; font-size: 12px; margin-top: 12px;">
+                                或点击导航栏的"API管理"标签
+                            </p>
                         </div>
                     </div>
                 </div>
                 
-                <button class="btn">保存设置</button>
+                <button class="btn" onclick="saveSettings()">保存设置</button>
+                <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #303030;">
+                    <p style="color: #666; font-size: 13px; line-height: 1.6;">
+                        <strong>提示:</strong> 设置会自动保存，切换主题和语言后立即生效。刷新页面后设置会自动恢复。
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // ==================== 主题和语言设置 ====================
+        
+        // 翻译文本
+        const translations = {
+            'zh-CN': {
+                title: '马来西亚食物智能识别系统管理平台',
+                dashboard: '仪表盘',
+                detection: '食物识别',
+                training: '模型训练',
+                models: '模型管理',
+                datasets: '数据集',
+                api: 'API管理',
+                settings: '设置',
+                saveSettings: '保存设置',
+                realData: '真实数据',
+                lastUpdate: '最后更新',
+                theme: '主题设置',
+                language: '语言设置',
+                settingsSaved: '设置已保存！',
+                settingsApplied: '主题和语言已应用'
+            },
+            'en': {
+                title: 'Malaysian Food Intelligent Recognition System',
+                dashboard: 'Dashboard',
+                detection: 'Food Detection',
+                training: 'Model Training',
+                models: 'Model Management',
+                datasets: 'Dataset',
+                api: 'API Management',
+                settings: 'Settings',
+                saveSettings: 'Save Settings',
+                realData: 'Real Data',
+                lastUpdate: 'Last Updated',
+                theme: 'Theme Settings',
+                language: 'Language Settings',
+                settingsSaved: 'Settings saved!',
+                settingsApplied: 'Theme and language applied'
+            }
+        };
+
+        // 应用主题
+        function applyTheme(theme) {
+            if (theme === 'light') {
+                document.body.classList.add('light-theme');
+            } else {
+                document.body.classList.remove('light-theme');
+            }
+        }
+
+        // 应用语言
+        function applyLanguage(lang) {
+            document.documentElement.lang = lang;
+            const t = translations[lang];
+            if (!t) return;
+            
+            // 更新标题
+            const headerP = document.querySelector('.header p');
+            if (headerP) headerP.textContent = t.title;
+            
+            // 更新按钮文本（保留emoji）
+            const emojiMap = {
+                'dashboard': '📊',
+                'detection': '🍽️',
+                'training': '🤖',
+                'models': '☁️',
+                'datasets': '📁',
+                'api': '🔧',
+                'settings': '⚙️'
+            };
+            document.querySelectorAll('.nav-tab').forEach((tab, index) => {
+                const keys = ['dashboard', 'detection', 'training', 'models', 'datasets', 'api', 'settings'];
+                if (keys[index] && t[keys[index]]) {
+                    tab.textContent = emojiMap[keys[index]] + ' ' + t[keys[index]];
+                }
+            });
+            
+            // 更新"保存设置"按钮文本
+            const saveBtn = document.querySelector('button[onclick*="saveSettings"]');
+            if (saveBtn) saveBtn.textContent = t.saveSettings;
+        }
+
+        // 保存设置
+        function saveSettings() {
+            const theme = document.getElementById('theme-selector').value;
+            const language = document.getElementById('language-selector').value;
+            
+            localStorage.setItem('nutriscan-theme', theme);
+            localStorage.setItem('nutriscan-language', language);
+            
+            applyTheme(theme);
+            applyLanguage(language);
+            
+            showNotification('✅ 设置已保存！刷新后会生效', 'success');
+        }
+
+        // 加载设置
+        function loadSettings() {
+            const savedTheme = localStorage.getItem('nutriscan-theme') || 'dark';
+            const savedLanguage = localStorage.getItem('nutriscan-language') || 'zh-CN';
+            
+            // 设置select的值
+            document.getElementById('theme-selector').value = savedTheme;
+            document.getElementById('language-selector').value = savedLanguage;
+            
+            // 应用设置
+            applyTheme(savedTheme);
+            applyLanguage(savedLanguage);
+        }
+
+        // 主题和语言切换事件
+        document.addEventListener('DOMContentLoaded', function() {
+            // 页面加载时应用保存的设置
+            loadSettings();
+            
+            // 添加主题切换事件
+            const themeSelector = document.getElementById('theme-selector');
+            if (themeSelector) {
+                themeSelector.addEventListener('change', function() {
+                    applyTheme(this.value);
+                    localStorage.setItem('nutriscan-theme', this.value);
+                });
+            }
+            
+            // 添加语言切换事件
+            const languageSelector = document.getElementById('language-selector');
+            if (languageSelector) {
+                languageSelector.addEventListener('change', function() {
+                    applyLanguage(this.value);
+                    localStorage.setItem('nutriscan-language', this.value);
+                });
+            }
+        });
+        
         // 标签页切换
         function showTab(tabName) {
             // 隐藏所有内容
@@ -901,8 +1159,92 @@
             // 显示选中的内容
             document.getElementById(tabName).classList.add('active');
             
-            // 添加选中标签的active类
-            event.target.classList.add('active');
+            // 添加选中标签的active类（如果event存在）
+            if (event && event.target && event.target.classList) {
+                event.target.classList.add('active');
+            } else {
+                // 如果没有event，通过标签名称查找对应的导航标签
+                const navTabMap = {
+                    'dashboard': '📊 仪表盘',
+                    'detection': '🍽️ 食物识别',
+                    'training': '🤖 模型训练',
+                    'models': '☁️ 模型管理',
+                    'datasets': '📁 数据集',
+                    'api': '🔧 API管理',
+                    'settings': '⚙️ 设置'
+                };
+                const label = navTabMap[tabName];
+                if (label) {
+                    document.querySelectorAll('.nav-tab').forEach(tab => {
+                        if (tab.textContent === label) {
+                            tab.classList.add('active');
+                        }
+                    });
+                }
+            }
+            
+            // 如果切换到 API 管理页面，加载真实监控数据
+            if (tabName === 'api') {
+                loadAPIMonitorData();
+            }
+        }
+        
+        // 加载API监控真实数据
+        async function loadAPIMonitorData() {
+            try {
+                // 测试健康检查和响应时间
+                const healthStart = performance.now();
+                const healthResponse = await fetch('/api/monitor/health');
+                const healthEnd = performance.now();
+                const healthTime = Math.round(healthEnd - healthStart);
+                const healthData = await healthResponse.json();
+                
+                const statsResponse = await fetch('/api/monitor/stats');
+                const stats = await statsResponse.json();
+                
+                if (healthResponse.ok && stats.success) {
+                    const totalCalls = stats.stats.api_calls || 0;
+                    const errors = stats.stats.errors || 0;
+                    
+                    // 更新服务可用性
+                    const availabilityEl = document.getElementById('api-availability');
+                    if (availabilityEl) {
+                        const availability = totalCalls > 0
+                            ? ((100 - (errors / totalCalls) * 100)).toFixed(1) + '%'
+                            : '100%';
+                        availabilityEl.textContent = availability;
+                    }
+                    
+                    // 更新响应时间
+                    const responseTimeEl = document.getElementById('api-response-time');
+                    if (responseTimeEl) {
+                        responseTimeEl.textContent = healthTime + 'ms';
+                    }
+                    
+                    // 更新API总调用次数
+                    const totalCallsEl = document.getElementById('api-total-calls');
+                    if (totalCallsEl) {
+                        totalCallsEl.textContent = totalCalls.toLocaleString();
+                    }
+                    
+                    // 更新错误次数
+                    const errorsEl = document.getElementById('api-errors');
+                    if (errorsEl) {
+                        errorsEl.textContent = errors;
+                    }
+                }
+            } catch (error) {
+                console.error('加载监控数据失败:', error);
+                // 显示错误状态
+                const availabilityEl = document.getElementById('api-availability');
+                const responseTimeEl = document.getElementById('api-response-time');
+                const totalCallsEl = document.getElementById('api-total-calls');
+                const errorsEl = document.getElementById('api-errors');
+                if (availabilityEl) availabilityEl.textContent = '0%';
+                if (responseTimeEl) responseTimeEl.textContent = 'N/A';
+                if (totalCallsEl) totalCallsEl.textContent = 'N/A';
+                if (errorsEl) errorsEl.textContent = 'N/A';
+            }
         }
 
         // 测试API
@@ -1149,8 +1491,8 @@
                 const sessionsResponse = await fetch('/api/training/sessions');
                 const sessionsData = await sessionsResponse.json();
                 
-                // 加载数据集
-                const datasetsResponse = await fetch('/api/datasets');
+                // 加载数据集（强制刷新缓存）
+                const datasetsResponse = await fetch(`/api/datasets?refresh=true&_=${Date.now()}`);
                 const datasetsData = await datasetsResponse.json();
                 
                 // 加载模型
@@ -1218,9 +1560,9 @@
         // 更新关键指标
         function updateKeyMetrics(stats) {
             const metrics = [
-                { id: 'active-sessions', value: stats?.active_sessions || 0 },
+                { id: 'active-training', value: stats?.active_sessions || 0 },
                 { id: 'total-datasets', value: stats?.total_datasets || 0 },
-                { id: 'total-models', value: stats?.total_models || 0 },
+                { id: 'model-versions', value: stats?.total_models || 0 },
                 { id: 'api-calls', value: stats?.api_calls || 0 }
             ];
             
@@ -1234,23 +1576,18 @@
 
         // 更新训练会话
         function updateTrainingSessions(sessions) {
-            const sessionsContainer = document.querySelector('.sessions-list');
-            if (!sessionsContainer) return;
             // 保存到全局，供详情按钮使用
             window.__NS_SESSIONS__ = sessions;
             
-            if (sessions.length === 0) {
-                sessionsContainer.innerHTML = `
+            const emptyHtml = `
                     <div class="empty-state">
                         <div class="empty-icon">📊</div>
                         <h3>暂无训练会话</h3>
                         <p>点击"模型训练"开始您的第一个训练任务</p>
                     </div>
                 `;
-                return;
-            }
             
-            sessionsContainer.innerHTML = sessions.map(session => `
+            const sessionsHtml = sessions.length > 0 ? sessions.map(session => `
                 <div class="session-item" data-session-id="${session.id}" style="border:1px solid #303030;border-radius:10px;padding:14px;margin-bottom:12px;background:#1a1a1a;">
                     <div class="session-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
                         <div>
@@ -1269,7 +1606,14 @@
                         ${renderSessionDetailHTML(session)}
                     </div>
                 </div>
-            `).join('');
+            `).join('') : emptyHtml;
+            
+            // 更新所有sessions-list容器
+            document.querySelectorAll('.sessions-list').forEach(container => {
+                if (container) {
+                    container.innerHTML = sessionsHtml;
+                }
+            });
         }
 
         // 渲染会话详情区域
@@ -1346,14 +1690,23 @@
         function initChartsWithRealData(stats, sessions, datasets) {
             console.log('🔍 初始化图表，数据:', { stats, sessions, datasets });
             
-            // 准确率趋势图 - 如果没有训练数据，显示空状态
+            // 准确率趋势图 - 检查是否有真实训练指标数据
             console.log('🔍 开始查找accuracyChart元素...');
             const accuracyCanvas = document.getElementById('accuracyChart');
             console.log('🔍 accuracyCanvas:', accuracyCanvas);
-            console.log('🔍 DOM中所有canvas元素:', document.querySelectorAll('canvas'));
+            
+            // 检查是否有真实的训练指标数据（mAP50, precision, recall等）
+            const hasRealAccuracyData = sessions.some(session => 
+                session.metrics && (
+                    session.metrics['metrics/mAP50(B)'] != null ||
+                    session.metrics['metrics/mAP50-95(B)'] != null ||
+                    session.metrics['metrics/precision(B)'] != null ||
+                    session.metrics['metrics/recall(B)'] != null
+                )
+            );
+            
             if (!accuracyCanvas) {
                 console.error('❌ 找不到accuracyChart元素');
-                console.log('🔍 当前DOM状态:', document.readyState);
                 // 不return，继续执行数据集分布图
             } else {
                 // 销毁现有的准确率图表实例
@@ -1363,81 +1716,85 @@
                 }
                 
                 const accuracyCtx = accuracyCanvas.getContext('2d');
-                if (sessions.length === 0) {
-                accuracyCtx.canvas.style.display = 'none';
-                // 不删除canvas元素，只隐藏它
-                const parentElement = document.getElementById('accuracyChart').parentElement;
-                parentElement.innerHTML = `
-                    <div class="empty-chart">
-                        <div class="empty-icon">📈</div>
-                        <h3>暂无训练数据</h3>
-                        <p>开始训练后显示准确率趋势</p>
-                    </div>
-                `;
-                // 重新添加canvas元素
-                parentElement.innerHTML += '<canvas id="accuracyChart"></canvas>';
-            }
-            
-            // 如果有训练数据，显示真实图表
-            // 检查是否有真实的训练准确率数据
-            const hasRealAccuracyData = sessions.some(session => 
-                session.metrics && session.metrics.accuracy && session.metrics.accuracy.length > 0
-            );
-            
-            if (!hasRealAccuracyData) {
-                // 没有真实准确率数据，显示空状态
-                accuracyCtx.canvas.style.display = 'none';
-                const parentElement = document.getElementById('accuracyChart').parentElement;
-                parentElement.innerHTML = `
-                    <div class="empty-chart">
-                        <div class="empty-icon">📈</div>
-                        <h3>暂无准确率数据</h3>
-                        <p>训练完成后显示真实准确率趋势</p>
-                    </div>
-                `;
-                // 重新添加canvas元素
-                parentElement.innerHTML += '<canvas id="accuracyChart"></canvas>';
-            } else {
-                // 使用真实准确率数据
-            window.accuracyChartInstance = new Chart(accuracyCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Epoch 1', 'Epoch 20', 'Epoch 40', 'Epoch 60', 'Epoch 80', 'Epoch 100'],
-                    datasets: [{
-                        label: '训练准确率',
-                        data: sessions[0].metrics.accuracy || [0.45, 0.68, 0.78, 0.85, 0.89, 0.92],
-                        borderColor: '#1890ff',
-                        backgroundColor: 'rgba(24, 144, 255, 0.1)',
-                        tension: 0.4,
-                    }, {
-                        label: '验证准确率',
-                        data: sessions[0].metrics.val_accuracy || [0.42, 0.65, 0.75, 0.82, 0.86, 0.89],
-                        borderColor: '#52c41a',
-                        backgroundColor: 'rgba(82, 196, 26, 0.1)',
-                        tension: 0.4,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: { color: '#ffffff' }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { color: '#a6a6a6' },
-                            grid: { color: '#303030' }
+                
+                if (!hasRealAccuracyData) {
+                    // 没有真实准确率数据，显示空状态
+                    accuracyCtx.canvas.style.display = 'none';
+                    const parentElement = document.getElementById('accuracyChart').parentElement;
+                    parentElement.innerHTML = `
+                        <div class="empty-chart">
+                            <div class="empty-icon">📈</div>
+                            <h3>暂无准确率数据</h3>
+                            <p>训练完成后显示真实准确率趋势</p>
+                        </div>
+                    `;
+                    // 重新添加canvas元素
+                    parentElement.innerHTML += '<canvas id="accuracyChart"></canvas>';
+                } else {
+                    // 使用真实指标数据（从第一个会话获取）
+                    const metrics = sessions[0].metrics || {};
+                    const mAP50 = metrics['metrics/mAP50(B)'] || metrics['metrics/mAP50'] || 0;
+                    const mAP5095 = metrics['metrics/mAP50-95(B)'] || metrics['metrics/mAP50-95'] || 0;
+                    const precision = metrics['metrics/precision(B)'] || metrics['metrics/precision'] || 0;
+                    const recall = metrics['metrics/recall(B)'] || metrics['metrics/recall'] || 0;
+                    
+                    window.accuracyChartInstance = new Chart(accuracyCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['mAP50', 'mAP50-95', 'Precision', 'Recall'],
+                            datasets: [{
+                                label: '模型性能指标',
+                                data: [mAP50, mAP5095, precision, recall],
+                                backgroundColor: [
+                                    'rgba(24, 144, 255, 0.8)',
+                                    'rgba(82, 196, 26, 0.8)',
+                                    'rgba(250, 173, 20, 0.8)',
+                                    'rgba(114, 46, 209, 0.8)'
+                                ],
+                                borderColor: [
+                                    '#1890ff',
+                                    '#52c41a',
+                                    '#faad14',
+                                    '#722ed1'
+                                ],
+                                borderWidth: 2,
+                            }]
                         },
-                        y: {
-                            ticks: { color: '#a6a6a6' },
-                            grid: { color: '#303030' }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': ' + (context.parsed.y * 100).toFixed(1) + '%';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#a6a6a6' },
+                                    grid: { color: '#303030' }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#a6a6a6',
+                                        callback: function(value) {
+                                            return (value * 100).toFixed(0) + '%';
+                                        }
+                                    },
+                                    grid: { color: '#303030' },
+                                    min: 0,
+                                    max: 1
+                                }
+                            }
                         }
-                    }
+                    });
                 }
-            });
-            }
             }
 
             // 数据集页统计（真实）
@@ -1478,29 +1835,309 @@
             }
             
             // 如果有数据集，显示真实分布
-            const datasetLabels = datasets.map(d => d.name);
-            const datasetData = datasets.map(d => d.file_count || 0);
+            // 优先显示类别分布，其次显示splits分布
+            const firstDataset = datasets[0];
+            console.log('🔍 第一个数据集:', firstDataset);
+            console.log('🔍 class_distribution:', firstDataset?.class_distribution);
+            console.log('🔍 class_distribution keys:', firstDataset?.class_distribution ? Object.keys(firstDataset.class_distribution) : 'none');
             
-            window.datasetChartInstance = new Chart(datasetCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: datasetLabels,
-                    datasets: [{
-                        data: datasetData,
-                        backgroundColor: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96'],
-                        borderWidth: 0,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: { color: '#ffffff' }
+            // 检查是否有类别分布数据
+            if (firstDataset && firstDataset.class_distribution && typeof firstDataset.class_distribution === 'object' && Object.keys(firstDataset.class_distribution).length > 0) {
+                const classDist = firstDataset.class_distribution;
+                const classLabels = Object.keys(classDist);
+                const classData = classLabels.map(name => classDist[name]);
+                
+                // 使用多种颜色
+                const colors = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96', '#fa8c16'];
+                const backgroundColors = classLabels.map((_, idx) => colors[idx % colors.length]);
+                
+                window.datasetChartInstance = new Chart(datasetCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: classLabels,
+                        datasets: [{
+                            data: classData,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { 
+                                    color: '#ffffff',
+                                    padding: 15,
+                                    font: { size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = classData.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                        return `${context.label}: ${context.parsed} 张 (${percentage}%)`;
+                                    }
+                                }
+                            }
                         }
                     }
+                });
+            } else if (firstDataset && firstDataset.splits && (firstDataset.splits.train || firstDataset.splits.valid || firstDataset.splits.test)) {
+                // 如果没有类别分布，回退到splits分布
+                const splits = firstDataset.splits;
+                const splitLabels = ['训练集 (Train)', '验证集 (Valid)', '测试集 (Test)'];
+                const splitData = [splits.train || 0, splits.valid || 0, splits.test || 0];
+                
+                window.datasetChartInstance = new Chart(datasetCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: splitLabels,
+                        datasets: [{
+                            data: splitData,
+                            backgroundColor: ['#1890ff', '#52c41a', '#faad14'],
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { 
+                                    color: '#ffffff',
+                                    padding: 15,
+                                    font: { size: 13 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = splitData.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                        return `${context.label}: ${context.parsed} 张 (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // 如果没有splits信息，回退到数据集列表
+                const datasetLabels = datasets.map(d => d.name);
+                const datasetData = datasets.map(d => d.file_count || 0);
+                
+                window.datasetChartInstance = new Chart(datasetCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: datasetLabels,
+                        datasets: [{
+                            data: datasetData,
+                            backgroundColor: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96'],
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#ffffff' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // ==================== 食物识别功能 ====================
+        
+        // 处理图片上传
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // 验证文件类型和大小
+            if (!file.type.startsWith('image/')) {
+                showNotification('❌ 请上传图片文件', 'error');
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                showNotification('❌ 图片大小不能超过10MB', 'error');
+                return;
+            }
+            
+            // 显示预览
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewImg = document.getElementById('preview-image');
+                previewImg.src = e.target.result;
+                previewImg.style.display = 'block';
+                
+                // 显示结果区域
+                document.getElementById('detection-results').style.display = 'block';
+                document.getElementById('detection-loading').style.display = 'block';
+                document.getElementById('detection-content').style.display = 'none';
+                
+                // 开始分析
+                analyzeFoodImage(file);
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 分析食物图片
+        async function analyzeFoodImage(file) {
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                const response = await fetch('/api/detection/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                // 隐藏加载状态
+                document.getElementById('detection-loading').style.display = 'none';
+                document.getElementById('detection-content').style.display = 'block';
+                
+                if (result.success && result.detections) {
+                    displayDetectionResults(result);
+                } else {
+                    // 显示详细错误信息
+                    let errorMessage = result.error || '识别失败，请重试';
+                    if (result.details) {
+                        errorMessage += '\n\n详细信息：';
+                        if (result.details.python_error) {
+                            errorMessage += '\nPython错误: ' + result.details.python_error;
+                        }
+                        if (result.raw_output) {
+                            errorMessage += '\n原始输出: ' + result.raw_output.substring(0, 200);
+                        }
+                    }
+                    showDetectionError(errorMessage);
                 }
+            } catch (error) {
+                console.error('识别错误:', error);
+                document.getElementById('detection-loading').style.display = 'none';
+                showDetectionError('网络错误：' + error.message);
+            }
+        }
+        
+        // 显示识别结果
+        function displayDetectionResults(result) {
+            const contentDiv = document.getElementById('detection-content');
+            const detections = result.detections || [];
+            
+            if (detections.length === 0) {
+                contentDiv.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🤷</div>
+                        <h3 style="color: #ffffff; margin-bottom: 8px;">未识别到食物</h3>
+                        <p style="color: #a6a6a6;">请尝试上传更清晰的食物照片</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 绘制结果到canvas
+            drawDetectionBoxes(result.image_url || document.getElementById('preview-image').src, detections);
+            
+            // 显示识别结果
+            let html = '<div style="margin-bottom: 20px;"><h4 style="color: #52c41a; margin-bottom: 16px;">✅ 识别成功</h4></div>';
+            
+            detections.forEach((detection, index) => {
+                const confidence = (detection.confidence * 100).toFixed(1);
+                const className = detection.class || detection.name || '未知';
+                html += `
+                    <div style="border: 1px solid #404040; border-radius: 8px; padding: 16px; margin-bottom: 12px; background: #262626;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="color: #ffffff; margin: 0; font-size: 18px;">${className}</h4>
+                            <span style="background: #1890ff; color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;">${confidence}%</span>
+                        </div>
+                        <div style="color: #a6a6a6; font-size: 14px;">
+                            <div>位置: (${Math.round(detection.bbox?.[0] || 0)}, ${Math.round(detection.bbox?.[1] || 0)})</div>
+                            <div>大小: ${Math.round(detection.bbox?.[2] || 0)} × ${Math.round(detection.bbox?.[3] || 0)} 像素</div>
+                        </div>
+                    </div>
+                `;
             });
+            
+            contentDiv.innerHTML = html;
+            showNotification(`✅ 成功识别 ${detections.length} 个食物`, 'success');
+        }
+        
+        // 绘制检测框
+        function drawDetectionBoxes(imageSrc, detections) {
+            const canvas = document.getElementById('result-canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                detections.forEach((detection, index) => {
+                    const [x, y, width, height] = detection.bbox || [];
+                    const className = detection.class || detection.name || '未知';
+                    const confidence = (detection.confidence * 100).toFixed(1);
+                    
+                    // 绘制边界框
+                    ctx.strokeStyle = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f'][index % 4];
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // 绘制标签背景
+                    ctx.fillStyle = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f'][index % 4];
+                    ctx.font = 'bold 16px Arial';
+                    const label = `${className} ${confidence}%`;
+                    const textMetrics = ctx.measureText(label);
+                    const textWidth = textMetrics.width;
+                    
+                    ctx.fillRect(x, y - 25, textWidth + 10, 25);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(label, x + 5, y - 8);
+                });
+                
+                // 显示canvas，隐藏原图
+                canvas.style.display = 'block';
+                document.getElementById('preview-image').style.display = 'none';
+            };
+            
+            img.src = imageSrc;
+        }
+        
+        // 显示错误
+        function showDetectionError(message) {
+            const contentDiv = document.getElementById('detection-content');
+            // 将多行错误消息转换为HTML
+            const messageHtml = message.split('\n').map(line => {
+                if (line.trim()) {
+                    return `<p style="color: #a6a6a6; margin: 4px 0; font-size: 13px;">${line}</p>`;
+                }
+                return '';
+            }).join('');
+            
+            contentDiv.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                    <h3 style="color: #ff4d4f; margin-bottom: 16px;">识别失败</h3>
+                    <div style="text-align: left; background: #1a1a1a; border: 1px solid #404040; border-radius: 8px; padding: 16px; margin-top: 16px;">
+                        ${messageHtml}
+                    </div>
+                    <button class="btn-primary" onclick="document.getElementById('image-input').click()" style="margin-top: 20px;">重新上传</button>
+                </div>
+            `;
+            contentDiv.style.display = 'block';
+            
+            // 提取主要错误信息用于通知
+            const mainError = message.split('\n')[0] || message;
+            showNotification('❌ ' + mainError, 'error');
         }
 
         // 页面加载完成后初始化

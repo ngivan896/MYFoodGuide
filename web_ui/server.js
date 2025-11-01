@@ -3,6 +3,10 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 // 导入真实数据服务
 const realDataService = require('./services/real-data-service');
@@ -24,7 +28,7 @@ const PORT = process.env.PORT || 5000;
 // 中间件
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'client/build')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 数据存储 (临时使用JSON文件，生产环境建议使用数据库)
 const DATA_DIR = path.join(__dirname, 'data');
@@ -529,6 +533,11 @@ app.post('/api/training/colab/stop/:sessionId', (req, res) => {
 // 获取数据集列表
 app.get('/api/datasets', async (req, res) => {
     try {
+        // 如果请求参数包含 refresh=true，清除缓存
+        if (req.query.refresh === 'true') {
+            realDataService.cache.delete('datasets');
+            console.log('🔄 已清除数据集缓存');
+        }
         const datasets = await realDataService.getDatasets();
         res.json({
             success: true,
@@ -1277,6 +1286,300 @@ app.post('/api/config/test', async (req, res) => {
     }
 });
 
+// ==================== 食物识别 API ====================
+
+// 配置multer存储 - 保留原始扩展名
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, 'uploads'));
+    },
+    filename: (req, file, cb) => {
+        // 保留原始文件名和扩展名
+        const ext = path.extname(file.originalname);
+        const name = path.basename(file.originalname, ext);
+        // 生成唯一文件名，但保留扩展名
+        const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
+        cb(null, uniqueName);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('只支持图片文件'), false);
+        }
+    }
+});
+
+// 确保uploads目录存在
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// 食物识别分析API
+app.post('/api/detection/analyze', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: '请上传图片文件'
+            });
+        }
+
+        const imagePath = req.file.path; // multer会设置完整路径
+        const imageName = req.file.filename;
+        
+        console.log(`📸 收到图片上传: ${imageName}`);
+        console.log(`📁 完整图片路径: ${imagePath}`);
+        
+        // 查找最新的训练模型
+        const trainingSessions = readJsonFile(trainingSessionsFile);
+        const sessions = Object.values(trainingSessions);
+        const completedSessions = sessions.filter(s => s.status === 'completed' && s.best_model_path);
+        
+        if (completedSessions.length === 0) {
+            // 清理临时文件
+            fs.unlinkSync(imagePath);
+            return res.status(404).json({
+                success: false,
+                error: '未找到训练好的模型，请先完成模型训练'
+            });
+        }
+        
+        // 使用最新的模型
+        const latestSession = completedSessions.sort((a, b) => 
+            new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        )[0];
+        
+        const modelPath = path.isAbsolute(latestSession.best_model_path) 
+            ? latestSession.best_model_path 
+            : path.join(__dirname, '..', latestSession.best_model_path);
+        
+        // 检查模型文件是否存在
+        if (!fs.existsSync(modelPath)) {
+            fs.unlinkSync(imagePath);
+            return res.status(404).json({
+                success: false,
+                error: '模型文件不存在: ' + modelPath
+            });
+        }
+        
+        console.log(`🤖 使用模型: ${modelPath}`);
+        
+        // 调用Python脚本进行推理（如果Python不可用，返回模拟结果用于演示）
+        try {
+            // 检查是否有Python环境
+            const { stdout: pythonVersion } = await execPromise('python --version').catch(() => ({ stdout: '' }));
+            const hasPython = pythonVersion.includes('Python');
+            
+            if (hasPython) {
+                // 创建Python推理脚本
+                // 转换Windows路径格式
+                const modelPathEscaped = modelPath.replace(/\\/g, '\\\\');
+                const imagePathEscaped = imagePath.replace(/\\/g, '\\\\');
+                
+                // 使用原始路径，Python会自动处理
+                const modelPathNormalized = modelPath.replace(/\\/g, '/');
+                const imagePathNormalized = imagePath.replace(/\\/g, '/');
+                
+                const pythonScript = `# -*- coding: utf-8 -*-
+import sys
+import json
+import os
+from pathlib import Path
+
+# 设置输出编码
+sys.stdout.reconfigure(encoding='utf-8') if hasattr(sys.stdout, 'reconfigure') else None
+
+try:
+    from ultralytics import YOLO
+    
+    model_path = r"${modelPathNormalized}"
+    image_path = r"${imagePathNormalized}"
+    
+    # 验证文件存在
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"模型文件不存在: {model_path}")
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"图片文件不存在: {image_path}")
+    
+    # 加载模型
+    model = YOLO(model_path)
+    
+    # 进行推理
+    results = model(image_path, conf=0.25, save=False, verbose=False)
+    
+    detections = []
+    for result in results:
+        if hasattr(result, 'boxes') and result.boxes is not None:
+            boxes = result.boxes
+            for i in range(len(boxes)):
+                box = boxes[i]
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                xyxy = box.xyxy[0].tolist()
+                
+                # 获取类别名称
+                class_name = result.names[cls] if hasattr(result, 'names') and cls < len(result.names) else f"class_{cls}"
+                
+                detections.append({
+                    "class": class_name,
+                    "confidence": conf,
+                    "bbox": [xyxy[0], xyxy[1], xyxy[2] - xyxy[0], xyxy[3] - xyxy[1]]
+                })
+    
+    print(json.dumps({"success": True, "detections": detections}, ensure_ascii=False))
+except FileNotFoundError as e:
+    print(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+    sys.exit(1)
+except ImportError as e:
+    print(json.dumps({"success": False, "error": f"导入错误: {str(e)}. 请确保已安装ultralytics: pip install ultralytics"}, ensure_ascii=False))
+    sys.exit(1)
+except Exception as e:
+    import traceback
+    error_msg = f"{type(e).__name__}: {str(e)}"
+    traceback_str = traceback.format_exc()
+    print(json.dumps({"success": False, "error": error_msg, "traceback": traceback_str}, ensure_ascii=False))
+    sys.exit(1)
+`;
+                
+                const scriptPath = path.join(uploadsDir, `inference_${Date.now()}.py`);
+                fs.writeFileSync(scriptPath, pythonScript, 'utf8');
+                
+                console.log(`📝 Python脚本已创建: ${scriptPath}`);
+                console.log(`🤖 模型路径: ${modelPath}`);
+                console.log(`📸 图片路径: ${imagePath}`);
+                
+                // 执行Python脚本 - 使用绝对路径并捕获详细错误
+                let stdout, stderr;
+                try {
+                    const command = `python "${scriptPath}" 2>&1`;
+                    const result = await execPromise(command, { 
+                        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+                        cwd: path.dirname(scriptPath)
+                    });
+                    stdout = result.stdout;
+                    stderr = result.stderr;
+                    
+                    console.log(`✅ Python执行成功`);
+                    console.log(`📤 输出: ${stdout.substring(0, 200)}`);
+                } catch (execError) {
+                    stdout = execError.stdout || '';
+                    stderr = execError.stderr || execError.message || '';
+                    console.error(`❌ Python执行失败:`, execError);
+                    console.error(`📥 标准输出:`, stdout);
+                    console.error(`📥 标准错误:`, stderr);
+                    
+                    // 清理文件
+                    if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+                    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+                    
+                    return res.status(500).json({
+                        success: false,
+                        error: `Python执行失败: ${stderr || execError.message || '未知错误'}`,
+                        details: {
+                            script: scriptPath,
+                            model: modelPath,
+                            python_error: stderr
+                        }
+                    });
+                }
+                
+                // 清理Python脚本
+                if (fs.existsSync(scriptPath)) {
+                    fs.unlinkSync(scriptPath);
+                }
+                
+                // 解析结果
+                let result;
+                try {
+                    result = JSON.parse(stdout.trim());
+                } catch (parseError) {
+                    console.error(`❌ JSON解析失败:`, parseError);
+                    console.error(`📥 原始输出:`, stdout);
+                    
+                    // 清理临时图片
+                    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+                    
+                    return res.status(500).json({
+                        success: false,
+                        error: `结果解析失败: ${parseError.message}`,
+                        raw_output: stdout.substring(0, 500)
+                    });
+                }
+                
+                // 清理临时图片
+                if (fs.existsSync(imagePath)) {
+                    fs.unlinkSync(imagePath);
+                }
+                
+                if (result.success) {
+                    res.json({
+                        success: true,
+                        detections: result.detections,
+                        model_used: latestSession.id,
+                        model_name: latestSession.name || 'Latest Model'
+                    });
+                } else {
+                    res.status(500).json({
+                        success: false,
+                        error: result.error || '推理失败',
+                        details: result
+                    });
+                }
+            } else {
+                // Python不可用，返回模拟结果（用于演示）
+                console.log('⚠️ Python环境不可用，返回模拟结果');
+                const mockResult = {
+                    success: true,
+                    detections: [
+                        {
+                            class: "Char Kway Teow",
+                            confidence: 0.95,
+                            bbox: [100, 100, 300, 200]
+                        }
+                    ],
+                    model_used: latestSession.id,
+                    model_name: latestSession.name || 'Latest Model',
+                    note: '模拟结果 - 请安装Python和ultralytics包以使用真实推理'
+                };
+                
+                // 清理临时图片
+                fs.unlinkSync(imagePath);
+                
+                res.json(mockResult);
+            }
+        } catch (pythonError) {
+            console.error('Python推理错误:', pythonError);
+            // 清理临时文件
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+            
+            res.status(500).json({
+                success: false,
+                error: '推理服务错误: ' + pythonError.message
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error in detection API:', error);
+        // 清理临时文件
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({
+            success: false,
+            error: '处理图片失败: ' + error.message
+        });
+    }
+});
+
 // ==================== 前端路由 ====================
 
 // 根路径加载主dashboard
@@ -1284,22 +1587,33 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 兜底：非 /api 的所有未知路径重定向到根路径
-app.get('*', (req, res) => {
+// 兜底：处理未知路径
+app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
+        // API路径但没有匹配的路由
         res.status(404).json({
             success: false,
             error: 'API endpoint not found',
+            method: req.method,
+            path: req.path,
             available_endpoints: [
-                '/api/monitor/health',
-                '/api/monitor/stats',
-                '/api/training/colab/templates',
-                '/api/datasets',
-                '/api/models/versions'
+                'GET /api/monitor/health',
+                'GET /api/monitor/stats',
+                'GET /api/training/colab/templates',
+                'GET /api/datasets',
+                'GET /api/models/versions',
+                'POST /api/detection/analyze'
             ]
         });
-    } else {
+    } else if (req.method === 'GET') {
+        // 非API的GET请求重定向到首页
         res.redirect('/');
+    } else {
+        // 其他请求返回404
+        res.status(404).json({
+            success: false,
+            error: 'Not found'
+        });
     }
 });
 

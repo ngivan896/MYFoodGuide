@@ -156,9 +156,22 @@ class RealDataService {
                             valid: typeof st.valid === 'number' ? st.valid : (typeof prjSplits.valid === 'number' ? prjSplits.valid : 0),
                             test: typeof st.test === 'number' ? st.test : (typeof prjSplits.test === 'number' ? prjSplits.test : 0),
                         };
+                        // 添加类别分布信息 - 确保从 prj.classes 获取
+                        if (prj.classes && typeof prj.classes === 'object' && !Array.isArray(prj.classes)) {
+                            ds.class_distribution = prj.classes;
+                            console.log('📊 类别分布数据已添加:', JSON.stringify(prj.classes));
+                        } else {
+                            console.warn('⚠️ 未找到类别分布数据，prj.classes:', prj.classes, '类型:', typeof prj.classes);
+                            // 如果 transformRoboflowData 已经设置了，保留它
+                            if (!ds.class_distribution || Object.keys(ds.class_distribution).length === 0) {
+                                console.warn('⚠️ class_distribution 为空或不存在');
+                            }
+                        }
                     }
+                    // 清除旧缓存以确保使用最新数据
+                    this.cache.delete(cacheKey);
                     this.setCachedData(cacheKey, data);
-                    console.log('✅ Roboflow数据获取成功');
+                    console.log('✅ Roboflow数据获取成功，包含class_distribution:', !!data.datasets[0]?.class_distribution);
                     return data;
                 } catch (e) {
                     console.error('从Roboflow获取数据失败:', e);
@@ -407,7 +420,10 @@ class RealDataService {
             const apiKeyQ = roboflowConfig.apiKey ? `?api_key=${encodeURIComponent(roboflowConfig.apiKey)}` : '';
             const projectPath = workspace ? `/${workspace}/${roboflowConfig.projectId}${apiKeyQ}` : `/${roboflowConfig.projectId}${apiKeyQ}`;
             const projectResponse = roboflowData.projectResp ? { data: roboflowData.projectResp } : await client.get(projectPath);
-            const projectData = (projectResponse.data && projectResponse.data.project) ? projectResponse.data.project : projectResponse.data;
+            // 兼容不同的响应格式：可能是 { project: {...} } 或直接是 project 对象
+            const projectDataRaw = projectResponse.data || {};
+            const projectData = projectDataRaw.project || projectDataRaw;
+            console.log('🔍 transformRoboflowData - projectData.classes:', projectData.classes);
             
             // 获取数据集统计信息
             const statsPath = workspace ? `/${workspace}/${roboflowConfig.projectId}/stats${apiKeyQ}` : `/${roboflowConfig.projectId}/stats${apiKeyQ}`;
@@ -438,7 +454,9 @@ class RealDataService {
                     train: typeof statsData.train === 'number' ? statsData.train : (projectData.splits?.train ?? 0),
                     valid: typeof statsData.valid === 'number' ? statsData.valid : (projectData.splits?.valid ?? 0),
                     test: typeof statsData.test === 'number' ? statsData.test : (projectData.splits?.test ?? 0)
-                }
+                },
+                // 添加类别分布信息 - 确保正确获取
+                class_distribution: (projectData.classes && typeof projectData.classes === 'object' && !Array.isArray(projectData.classes) && Object.keys(projectData.classes).length > 0) ? projectData.classes : {}
             }];
             
             return { datasets };
